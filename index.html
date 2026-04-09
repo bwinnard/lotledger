@@ -2960,7 +2960,7 @@ var msalApp = new msal.PublicClientApplication({
   auth: {
     clientId:    SP_CONFIG.clientId,
     authority:   'https://login.microsoftonline.com/' + SP_CONFIG.tenantId,
-    redirectUri: 'https://coronadowestaz.sharepoint.com'
+    redirectUri: 'https://bwinnard.github.io/lotledger/'
   },
   cache: { cacheLocation: 'sessionStorage' }
 });
@@ -3051,7 +3051,8 @@ async function loadFromSharePoint() {
       // Not signed in — trigger redirect to Microsoft login
       loadProgress('Redirecting to Microsoft sign-in…', 15);
       await msalApp.acquireTokenRedirect({
-        scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All']
+        scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
+        redirectUri: 'https://bwinnard.github.io/lotledger/'
       });
       return; // page redirects, code below won't run
     }
