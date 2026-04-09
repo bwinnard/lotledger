@@ -1,0 +1,3258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LotLedger Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f4f6f9; --surface:#fafcff; --surface2:#eaeff6;
+  --border:#d0d9e8; --border2:#b8c5d9;
+  --ink:#1a1d24; --ink2:#3d4559; --muted:#7a86a0;
+  --accent:#0f2548; --accent2:#1a3f7a; --gold:#c49a1e;
+  --avail:#1a5c34; --avail-bg:#e8f4ec;
+  --pend:#7a4a00;  --pend-bg:#fdf3e0;
+  --sold:#1a2a5c;  --sold-bg:#e8ecf8;
+  --danger:#5c1a1a; --danger-bg:#f8e8e8;
+  --warn:#7a4a00;  --warn-bg:#fdf3e0;
+  --sh:0 2px 8px rgba(0,0,0,.08); --shl:0 8px 32px rgba(0,0,0,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:1.5}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* topbar */
+.topbar{height:52px;background:var(--accent);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:fixed;top:0;left:0;right:0;z-index:50}
+.brand{font-family:'Libre Baskerville',serif;font-size:18px;color:#e8e4d8;letter-spacing:.5px}
+.brand sup{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}
+.topbar-right{display:flex;gap:8px}
+.tbtn{padding:5px 13px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;border:none;transition:all .15s;letter-spacing:.5px}
+.tbtn-ghost{background:rgba(255,255,255,.1);color:#d8d4c8;border:1px solid rgba(255,255,255,.2)}
+.tbtn-ghost:hover{background:rgba(255,255,255,.2);color:#fff}
+.tbtn-gold{background:var(--gold);color:#1a1200;font-weight:500}
+.tbtn-gold:hover{background:#d4a820}
+
+/* layout */
+.shell{display:flex;height:100vh;padding-top:52px}
+.sidebar{width:230px;min-width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:52px;left:0;bottom:0;z-index:40;overflow:hidden}
+.main{margin-left:230px;flex:1;overflow-y:auto;padding:24px 28px}
+
+/* sidebar */
+.sb-search-wrap{padding:10px 12px;border-bottom:1px solid var(--border)}
+.sb-search{width:100%;padding:6px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11px}
+.sb-search:focus{outline:none;border-color:var(--accent2)}
+.sb-nav{padding:8px 0;border-bottom:1px solid var(--border)}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;color:var(--ink2);font-size:12.5px;border-left:3px solid transparent;transition:all .12s}
+.nav-item:hover{background:var(--surface2);color:var(--ink)}
+.nav-item.active{background:var(--surface2);color:var(--accent);border-left-color:var(--accent);font-weight:500}
+.sb-label{padding:10px 14px 4px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.comm-scroll{flex:1;overflow-y:auto}
+.comm-row{padding:6px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-left:3px solid transparent;transition:background .12s}
+.comm-row:hover{background:var(--surface2)}
+.comm-row.active{background:var(--avail-bg);border-left-color:var(--avail)}
+.comm-name{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.comm-row.active .comm-name{color:var(--avail);font-weight:500}
+.cbadges{display:flex;gap:3px;flex-shrink:0}
+.cbadge{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 5px;border-radius:2px;min-width:16px;text-align:center}
+.cb-a{background:var(--avail-bg);color:var(--avail)}
+.cb-p{background:var(--pend-bg);color:var(--pend)}
+.cb-s{background:var(--sold-bg);color:var(--sold)}
+.sb-footer{padding:10px 12px;border-top:1px solid var(--border)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:5px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#e8e4d8}
+.btn-primary:hover{background:var(--accent2)}
+.btn-secondary{background:var(--surface);color:var(--ink2);border:1px solid var(--border2)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-gold{background:var(--gold);color:#1a1200;font-weight:500}
+.btn-gold:hover{background:#d4a820}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
+.btn-danger:hover{background:var(--danger);color:#fff}
+.btn-sm{padding:4px 10px;font-size:10px}
+.btn-xs{padding:3px 8px;font-size:10px}
+
+/* status chips */
+.chip{display:inline-block;padding:2px 9px;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.5px;text-transform:uppercase;font-weight:500;white-space:nowrap}
+.chip-a{background:var(--avail-bg);color:var(--avail)}
+.chip-p{background:var(--pend-bg);color:var(--pend)}
+.chip-s{background:var(--sold-bg);color:var(--sold)}
+
+/* page */
+.page{display:none}
+.page.active{display:block}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px}
+.page-title{font-family:'Libre Baskerville',serif;font-size:22px;color:var(--accent)}
+.page-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.page-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+/* kpi */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.kpi-av::before{background:var(--avail)}
+.kpi-pe::before{background:var(--gold)}
+.kpi-so::before{background:var(--sold)}
+.kpi-to::before{background:var(--accent)}
+.kpi-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.kpi-val{font-family:'Libre Baskerville',serif;font-size:28px;line-height:1;color:var(--ink)}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.kpi-sm .kpi-val{font-size:19px;color:var(--accent)}
+
+/* section card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:18px;overflow:hidden}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-family:'Libre Baskerville',serif;font-size:14px;color:var(--accent)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--surface2)}
+th{padding:8px 12px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--accent)}
+th.r,td.r{text-align:right}
+td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:12.5px;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg)}
+.tfoot-row td{background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;border-top:2px solid var(--border2);color:var(--accent)}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+/* filters */
+.filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.finput{padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11px}
+.finput:focus{outline:none;border-color:var(--accent2)}
+.fchip{padding:4px 11px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;transition:all .12s}
+.fchip:hover{border-color:var(--accent);color:var(--accent)}
+.fchip.on{background:var(--accent);color:#e8e4d8;border-color:var(--accent)}
+
+/* bulk bar */
+.bulk-bar{background:var(--accent);color:#e8e4d8;padding:9px 16px;border-radius:6px;display:none;align-items:center;justify-content:space-between;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:11px}
+.bulk-bar.show{display:flex}
+
+/* modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(28,26,23,.55);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;width:560px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shl)}
+.modal-head{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-family:'Libre Baskerville',serif;font-size:17px;color:var(--accent)}
+.modal-x{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:2px 5px;border-radius:3px}
+.modal-x:hover{background:var(--surface2)}
+.modal-body{padding:18px 22px}
+.modal-foot{padding:12px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+input,select,textarea{padding:7px 9px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px;transition:border-color .12s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent2);background:var(--surface)}
+select option{background:var(--surface)}
+textarea{resize:vertical}
+
+/* tabs */
+.tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:16px}
+.tab{padding:8px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'IBM Plex Mono',monospace;font-size:11px;transition:all .12s}
+.tab:hover{color:var(--ink)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* request cards */
+.req-card{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:12px 16px;margin-bottom:8px;display:flex;gap:14px;align-items:flex-start}
+.req-card:hover{box-shadow:var(--sh)}
+.req-main{flex:1;min-width:0}
+.req-hl{font-size:13px;font-weight:500;margin-bottom:3px}
+.req-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)}
+.req-lots{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);margin-top:2px}
+.req-note{font-size:11.5px;color:var(--ink2);margin-top:4px;font-style:italic}
+.req-actions{display:flex;gap:5px;flex-direction:column;align-items:flex-end;flex-shrink:0}
+
+/* alert styles */
+.alert-card{display:flex;align-items:flex-start;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)}
+.alert-card:last-child{border-bottom:none}
+.adot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.adot-red{background:var(--danger)}
+.adot-yel{background:var(--gold)}
+.alert-main{flex:1}
+.alert-hl{font-size:13px;font-weight:500;margin-bottom:2px}
+.alert-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);line-height:1.6}
+.abadge{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;padding:2px 9px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+.abadge-red{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger)}
+.abadge-yel{background:var(--warn-bg);color:var(--warn);border:1px solid var(--gold)}
+.abanner{border-radius:6px;padding:9px 14px;margin-bottom:10px;display:flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:11px}
+.abanner-red{background:var(--danger-bg);border:1px solid var(--danger);color:var(--danger)}
+.abanner-yel{background:var(--warn-bg);border:1px solid var(--gold);color:var(--warn)}
+
+/* activity log */
+.log-item{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.log-item:last-child{border-bottom:none}
+.log-time{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;min-width:120px}
+.log-msg{color:var(--ink2)}
+.log-msg strong{color:var(--ink)}
+
+/* empty */
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:28px;margin-bottom:8px}
+
+/* toast */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--accent);color:#e8e4d8;padding:11px 18px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;box-shadow:var(--shl);transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:999}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* drop zone */
+.dropzone{border:2px dashed var(--border2);border-radius:7px;padding:28px;text-align:center;color:var(--muted);cursor:pointer;transition:all .15s;font-family:'IBM Plex Mono',monospace;font-size:12px}
+.dropzone:hover{border-color:var(--accent2);background:var(--surface2)}
+
+/* td status */
+.td-ahead{color:var(--avail);font-family:'IBM Plex Mono',monospace;font-size:10px}
+.td-warn{color:var(--warn);font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500}
+.td-urgent{color:var(--danger);font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700}
+.td-past{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;text-decoration:line-through}
+.td-ok{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px}
+
+/* tier preview */
+.tier-preview{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);padding:7px 9px;background:var(--avail-bg);border-radius:4px;border:1px solid var(--avail);line-height:1.8}
+
+/* Archive */
+.archive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.archive-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:box-shadow .15s}
+.archive-card:hover{box-shadow:var(--shl)}
+.archive-card-head{background:var(--accent);padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between}
+.archive-card-name{font-family:'Libre Baskerville',serif;font-size:15px;color:#e8e4d8;font-weight:700}
+.archive-card-loc{font-size:11px;color:rgba(232,228,216,.6);margin-top:2px}
+.archive-badge{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:rgba(255,255,255,.15);color:#e8e4d8;padding:3px 8px;border-radius:3px;white-space:nowrap}
+.archive-card-body{padding:14px 16px}
+.archive-stat-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+.archive-stat-row:last-child{border-bottom:none}
+.archive-stat-label{color:var(--muted)}
+.archive-stat-val{font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--ink)}
+.archive-card-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.restore-badge{display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;background:var(--sold-bg);color:var(--sold);padding:2px 8px;border-radius:3px;border:1px solid var(--sold)}
+/* Pagination */
+#lot-pagination{display:flex}
+.pg-btn-active{background:var(--accent)!important;color:#e8e4d8!important;border-color:var(--accent)!important}
+
+.cf-select,.cf-input{
+  width:100%;padding:3px 5px;border:1px solid var(--border);border-radius:3px;
+  background:var(--surface);color:var(--ink);font-family:'IBM Plex Mono',monospace;
+  font-size:10px;box-sizing:border-box;
+}
+.cf-select:focus,.cf-input:focus{outline:none;border-color:var(--accent2);background:#fff}
+#col-filter-row td{padding:4px 6px;border-bottom:2px solid var(--border2)}
+
+/* QB/Toggle */
+.toggle-wrap{display:flex;align-items:center;justify-content:center;gap:6px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{position:absolute;inset:0;background:var(--border2);border-radius:20px;cursor:pointer;transition:background .2s}
+.toggle-slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle input:checked+.toggle-slider{background:var(--avail)}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px)}
+.toggle-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);min-width:22px;text-align:left}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">LotLedger <sup>PRO</sup></div>
+  <div class="topbar-right">
+    <button class="tbtn tbtn-ghost" onclick="openImportModal()" title="Import lots from CSV or Excel">⬆ Import</button>
+    <button class="tbtn tbtn-ghost" onclick="openExportModal()">⬇ Export</button>
+    <button class="tbtn tbtn-ghost" onclick="clearAll()" style="color:#f4a0a0" title="Clear all data and start fresh">✕ Clear Data</button>
+    <button class="tbtn tbtn-gold" onclick="openLotModal(null)">+ Add Lot</button>
+  </div>
+</header>
+
+<div class="shell">
+<aside class="sidebar">
+  <div class="sb-search-wrap">
+    <input class="sb-search" id="sb-search" placeholder="Search communities…" oninput="renderSidebar()">
+  </div>
+  <nav class="sb-nav">
+    <div class="nav-item active" data-pg="dashboard" onclick="nav('dashboard',this)">▦ &nbsp;Dashboard</div>
+    <div class="nav-item" data-pg="lots" onclick="nav('lots',this)">⊞ &nbsp;Lot Inventory</div>
+    <div class="nav-item" data-pg="requests" onclick="nav('requests',this)">◈ &nbsp;Purchase Requests</div>
+    <div class="nav-item" data-pg="calendar" onclick="nav('calendar',this)">🗓 &nbsp;Closing Calendar</div>
+    <div class="nav-item" data-pg="takedown" onclick="nav('takedown',this)">📅 &nbsp;Takedown Schedules</div>
+    <div class="nav-item" data-pg="archive" onclick="nav('archive',this)">🗃 &nbsp;Archive</div>
+    <div class="nav-item" data-pg="log" onclick="nav('log',this)">≡ &nbsp;Activity Log</div>
+  </nav>
+  <div class="sb-label">Communities</div>
+  <div class="comm-scroll" id="comm-scroll"></div>
+  <div class="sb-footer">
+    <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="openCommModal()">+ Add Community</button>
+    <div id="sb-archived-hint" onclick="nav('archive',document.querySelector('[data-pg=archive]'))" style="text-align:center;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);cursor:pointer;letter-spacing:.5px"></div>
+  </div>
+</aside>
+
+<main class="main">
+
+<!-- DASHBOARD -->
+<div id="page-dashboard" class="page active">
+  <div class="page-head">
+    <div>
+      <div class="page-title">Portfolio Overview</div>
+      <div class="page-sub" id="dash-sub"></div>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('lots',document.querySelector('[data-pg=lots]'))">View All Lots →</button>
+    </div>
+  </div>
+  <div class="kpi-row" id="kpi-row"></div>
+
+  <!-- Status Value Summary -->
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-head"><div class="card-title">Value by Status</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th>
+          <th class="r">Lot Count</th>
+          <th class="r">% of Inventory</th>
+          <th class="r">Total List Value</th>
+          <th class="r">Total Deposit Credits</th>
+          <th class="r">Net Value</th>
+        </tr></thead>
+        <tbody id="dash-status-summary"></tbody>
+        <tfoot><tr class="tfoot-row" id="dash-status-foot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="card" id="alerts-card" style="display:none">
+    <div class="card-head"><div class="card-title">⚠ Takedown Alerts</div><button class="btn btn-sm btn-secondary" onclick="nav('takedown',document.querySelector('[data-pg=takedown]'))">View Schedules →</button></div>
+    <div id="dash-alerts"></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Community Summary</div>
+      <input class="finput" id="comm-filter-dash" placeholder="Filter…" oninput="renderCommSummary()" style="width:160px">
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th onclick="sortCS('name')">Community ↕</th>
+          <th class="r" onclick="sortCS('total')">Total ↕</th>
+          <th class="r">Avail</th><th class="r">Pending</th><th class="r">Sold</th>
+          <th class="r" onclick="sortCS('listVal')">List Value ↕</th>
+          <th class="r">Deposit</th><th></th>
+        </tr></thead>
+        <tbody id="cs-body"></tbody>
+        <tfoot><tr class="tfoot-row" id="cs-foot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Pending Lots by Community</div><button class="btn btn-sm btn-secondary" onclick="nav('requests',document.querySelector('[data-pg=requests]'))">View All →</button></div>
+    <div id="dash-reqs"></div>
+  </div>
+</div>
+
+<!-- LOT INVENTORY -->
+<div id="page-lots" class="page">
+  <div class="page-head">
+    <div>
+      <div class="page-title" id="lot-title">Lot Inventory</div>
+      <div class="page-sub" id="lot-sub"></div>
+    </div>
+    <div class="page-actions">
+      <input class="finput" id="lot-search" placeholder="Search…" oninput="curPage=1;renderLots()" style="width:160px">
+      <button class="btn btn-secondary btn-sm" onclick="clearColFilters()">✕ Clear Filters</button>
+      <button class="btn btn-secondary btn-sm" onclick="openBulkAdd()">+ Bulk Add</button>
+      <button class="btn btn-primary" onclick="openLotModal(null)">+ Add Lot</button>
+    </div>
+  </div>
+  <div class="bulk-bar" id="bulk-bar">
+    <span id="bulk-count">0 selected</span>
+    <div style="display:flex;gap:6px">
+      <select id="bulk-st" class="finput" style="color:#e8e4d8;background:var(--accent2);border-color:#fff4">
+        <option value="">Change status to…</option>
+        <option>Available</option><option>Pending</option><option>Sold</option>
+      </select>
+      <button class="btn btn-gold btn-sm" onclick="bulkApply()">Apply</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#e8e4d8;border:1px solid rgba(255,255,255,.2)" onclick="clearSel()">Clear</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="sel-all" onchange="toggleAll(this)"></th>
+            <th onclick="sortL('community')">Community ↕</th>
+            <th onclick="sortL('buyer')">Builder ↕</th>
+            <th onclick="sortL('market')">Market ↕</th>
+            <th onclick="sortL('lotNumber')">Lot # ↕</th>
+            <th>Block/Phase</th>
+            <th onclick="sortL('status')">Status ↕</th>
+            <th style="text-align:center">Docs Sent</th>
+            <th onclick="sortL('closingDate')">Closing ↕</th>
+            <th onclick="sortL('tier')">Tier ↕</th>
+            <th class="r" onclick="sortL('listPrice')">List Price ↕</th>
+            <th class="r" onclick="sortL('depositCredit')">Deposit ↕</th>
+            <th class="r">Net</th>
+            <th style="text-align:center">QB Entry</th>
+            <th></th>
+          </tr>
+          <tr id="col-filter-row" style="background:var(--surface2)">
+            <td></td>
+            <td><select class="cf-select" id="cf-community" onchange="curPage=1;renderLots()"><option value="">All</option></select></td>
+            <td><select class="cf-select" id="cf-buyer" onchange="curPage=1;renderLots()"><option value="">All</option></select></td>
+            <td><select class="cf-select" id="cf-market" onchange="curPage=1;renderLots()"><option value="">All</option></select></td>
+            <td><input class="cf-input" id="cf-lot" placeholder="Filter…" oninput="curPage=1;renderLots()"></td>
+            <td><select class="cf-select" id="cf-block" onchange="curPage=1;renderLots()"><option value="">All</option></select></td>
+            <td><select class="cf-select" id="cf-status" onchange="curPage=1;renderLots()">
+              <option value="">All</option>
+              <option>Available</option>
+              <option>Pending</option>
+              <option>Sold</option>
+            </select></td>
+            <td><select class="cf-select" id="cf-docs" onchange="curPage=1;renderLots()">
+              <option value="">All</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select></td>
+            <td><input class="cf-input" id="cf-closing" placeholder="YYYY-MM" oninput="curPage=1;renderLots()" style="width:90px"></td>
+            <td><select class="cf-select" id="cf-tier" onchange="curPage=1;renderLots()"><option value="">All</option></select></td>
+            <td></td><td></td><td></td>
+            <td><select class="cf-select" id="cf-qb" onchange="curPage=1;renderLots()">
+              <option value="">All</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select></td>
+            <td><button class="btn btn-xs btn-secondary" onclick="clearColFilters()" title="Clear all column filters" style="white-space:nowrap">✕ Clear</button></td>
+          </tr>
+        </thead>
+        <tbody id="lot-tbody"></tbody>
+        <tfoot><tr class="tfoot-row" id="lot-tfoot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination controls -->
+  <div id="lot-pagination" style="display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)" id="pg-info"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn btn-secondary btn-sm" id="pg-first"  onclick="goPage(1)"       title="First page">«</button>
+      <button class="btn btn-secondary btn-sm" id="pg-prev"   onclick="goPage(curPage-1)" title="Previous">‹</button>
+      <div id="pg-numbers" style="display:flex;gap:4px"></div>
+      <button class="btn btn-secondary btn-sm" id="pg-next"   onclick="goPage(curPage+1)" title="Next">›</button>
+      <button class="btn btn-secondary btn-sm" id="pg-last"   onclick="goPage(totalPages)" title="Last page">»</button>
+      <select class="finput" id="pg-size" onchange="changePageSize()" style="width:90px;margin-left:8px">
+        <option value="50">50 / page</option>
+        <option value="100" selected>100 / page</option>
+        <option value="250">250 / page</option>
+        <option value="500">500 / page</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Status Value Summary -->
+  <div class="card">
+    <div class="card-head"><div class="card-title">Value by Status</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)" id="lot-summary-scope">Based on current filters</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th>
+          <th class="r">Lot Count</th>
+          <th class="r">% of Shown</th>
+          <th class="r">Total List Value</th>
+          <th class="r">Total Deposit Credits</th>
+          <th class="r">Net Value</th>
+        </tr></thead>
+        <tbody id="lot-status-summary"></tbody>
+        <tfoot><tr class="tfoot-row" id="lot-status-foot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PURCHASE REQUESTS -->
+<div id="page-requests" class="page">
+  <div class="page-head">
+    <div>
+      <div class="page-title">Purchase Requests</div>
+      <div class="page-sub">Auto-generated from lots marked Pending — updates live as statuses change</div>
+    </div>
+    <div class="page-actions">
+      <select class="finput" id="req-comm-filter" onchange="renderReqs()" style="width:190px">
+        <option value="">All Communities</option>
+      </select>
+    </div>
+  </div>
+  <div id="req-list"></div>
+</div>
+
+<!-- TAKEDOWN SCHEDULES -->
+<div id="page-takedown" class="page">
+  <div class="page-head">
+    <div><div class="page-title">Takedown Schedules</div><div class="page-sub">Per-community lot takedown schedules with alert tracking</div></div>
+    <div class="page-actions">
+      <select class="finput" id="td-comm-filter" onchange="renderTakedown()" style="width:180px">
+        <option value="">All Communities</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="openTDImport()">⬆ Import CSV</button>
+      <button class="btn btn-primary" onclick="openTDModal(null)">+ Add Entry</button>
+    </div>
+  </div>
+  <div id="td-banners"></div>
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Schedule Entries</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:10px">Alert window</label>
+        <select class="finput" id="alert-win" onchange="renderTakedown()" style="width:110px">
+          <option value="14">14 days</option>
+          <option value="30" selected>30 days</option>
+          <option value="60">60 days</option>
+          <option value="90">90 days</option>
+        </select>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Community</th><th>Date</th><th>Tier/Type</th>
+          <th class="r">Due</th><th class="r">Taken</th><th class="r">Remaining</th>
+          <th>Status</th><th>Notes</th><th></th>
+        </tr></thead>
+        <tbody id="td-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSING CALENDAR -->
+<div id="page-calendar" class="page">
+  <div class="page-head">
+    <div><div class="page-title">Closing Calendar</div><div class="page-sub">Expected closings for Pending and Sold lots</div></div>
+    <div class="page-actions" style="align-items:center;gap:12px">
+      <button class="btn btn-secondary btn-sm" onclick="calNav(-1)">← Prev</button>
+      <span id="cal-month-label" style="font-family:'Libre Baskerville',serif;font-size:15px;color:var(--accent);min-width:160px;text-align:center"></span>
+      <button class="btn btn-secondary btn-sm" onclick="calNav(1)">Next →</button>
+    </div>
+  </div>
+  <div class="card">
+    <div style="padding:14px">
+      <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px"></div>
+    </div>
+  </div>
+  <div id="cal-list"></div>
+</div>
+
+<!-- ACTIVITY LOG -->
+<div id="page-log" class="page">
+  <div class="page-head">
+    <div><div class="page-title">Activity Log</div><div class="page-sub">All changes and actions this session</div></div>
+    <div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="actLog=[];renderLog();toast('Log cleared')">Clear Log</button></div>
+  </div>
+  <div class="card" style="padding:6px 16px"><div id="log-body"></div></div>
+</div>
+
+<!-- ARCHIVE -->
+<div id="page-archive" class="page">
+  <div class="page-head">
+    <div>
+      <div class="page-title">Archive</div>
+      <div class="page-sub">Completed communities — sold out and closed</div>
+    </div>
+  </div>
+  <div id="archive-empty" class="empty" style="display:none">
+    <div class="empty-icon">🗃</div>
+    <div>No archived communities yet</div>
+    <div style="font-size:12px;margin-top:6px;color:var(--muted)">Communities are archived when all lots are Sold</div>
+  </div>
+  <div id="archive-grid"></div>
+</div>
+
+</main>
+</div>
+
+<!-- AUTO-ARCHIVE PROMPT -->
+<div class="overlay" id="archive-prompt">
+  <div class="modal" style="width:460px">
+    <div class="modal-head">
+      <div class="modal-title">🎉 Community Sold Out</div>
+      <button class="modal-x" onclick="closeArchivePrompt()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;line-height:1.7;color:var(--ink2);margin-bottom:14px">
+        <strong id="archive-prompt-name" style="color:var(--accent)"></strong> is 100% sold — all lots are marked Sold.<br>
+        Would you like to archive this community? It will be removed from active views and stored in the Archive section.
+      </p>
+      <div style="background:var(--surface2);border-radius:6px;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--muted)">
+        <span id="archive-prompt-stats"></span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeArchivePrompt()">Not Yet</button>
+      <button class="btn btn-primary" onclick="confirmArchive()">Archive Community</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSING DATE PROMPT -->
+<div class="overlay" id="closing-prompt">
+  <div class="modal" style="width:420px">
+    <div class="modal-head">
+      <div class="modal-title">Expected Closing Date</div>
+      <button class="modal-x" onclick="skipClosingPrompt()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;line-height:1.7;color:var(--ink2);margin-bottom:16px">
+        <span id="closing-prompt-desc"></span>
+      </p>
+      <div class="fg">
+        <label>Expected Closing Date</label>
+        <input type="date" id="closing-prompt-date" style="width:100%;font-size:14px;padding:10px">
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">This date will be applied to all lots being marked Pending in this action.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="skipClosingPrompt()">Skip for now</button>
+      <button class="btn btn-primary" onclick="applyClosingDate()">Apply Date</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOT MODAL -->
+<div class="overlay" id="lot-modal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="lm-title">Add Lot</div><button class="modal-x" onclick="closeLotModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="fg"><label>Community *</label><select id="lm-comm" onchange="loadTiers()"></select></div>
+        <div class="fg"><label>Status *</label><select id="lm-status"><option>Available</option><option>Pending</option><option>Sold</option></select></div>
+        <div class="fg"><label>Lot # (blank = TBD)</label><input id="lm-lot" placeholder="Leave blank if unplatted"></div>
+        <div class="fg"><label>Block / Phase (blank = TBD)</label><input id="lm-block" placeholder="Leave blank if unplatted"></div>
+        <div class="fg"><label>Builder / Buyer</label><input id="lm-buyer" placeholder="e.g. DR Horton"></div>
+        <div class="fg"><label>Market</label><input id="lm-market" placeholder="e.g. Phoenix, DFW"></div>
+        <div class="fg"><label>Price Tier</label><select id="lm-tier" onchange="applyTier()"><option value="">No tier — custom pricing</option></select></div>
+        <div class="fg" id="tier-preview-wrap" style="display:none"><label>Tier Pricing</label><div class="tier-preview" id="tier-preview"></div></div>
+        <div class="fg"><label>List Price ($)</label><input type="number" id="lm-price" placeholder="0"></div>
+        <div class="fg"><label>Deposit Credit ($)</label><input type="number" id="lm-deposit" placeholder="0"></div>
+        <div class="fg"><label>Contract Date</label><input type="date" id="lm-cdate"></div>
+        <div class="fg"><label>Expected Closing</label><input type="date" id="lm-closing"></div>
+        <div class="fg full"><label>Notes</label><textarea id="lm-notes" rows="2" placeholder="Contingencies, details…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger btn-sm" id="lm-del" style="display:none;margin-right:auto" onclick="deleteLot()">Delete</button>
+      <button class="btn btn-secondary" onclick="closeLotModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLot()">Save Lot</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNITY MODAL -->
+<div class="overlay" id="comm-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-head"><div class="modal-title" id="cm-title">Add Community</div><button class="modal-x" onclick="closeCommModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="fg"><label>Community Name *</label><input id="cm-name" placeholder="e.g. Meadow Creek"></div>
+        <div class="fg"><label>City / State</label><input id="cm-loc" placeholder="e.g. Gilbert, AZ"></div>
+        <div class="fg"><label>Market</label><input id="cm-market" placeholder="e.g. Phoenix Metro"></div>
+        <div class="fg"><label>Total Planned Lots</label><input type="number" id="cm-total" placeholder="0"></div>
+        <div class="fg full"><label>Notes</label><textarea id="cm-notes" rows="2"></textarea></div>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-family:'Libre Baskerville',serif;font-size:14px;color:var(--accent)">Price Tiers</div>
+          <button class="btn btn-sm btn-secondary" onclick="addTierRow()">+ Add Tier</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:6px;margin-bottom:6px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Name</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">List $</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Deposit $</div>
+          <div></div>
+        </div>
+        <div id="tier-rows"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger btn-sm" id="cm-delete" style="display:none;margin-right:auto" onclick="deleteCommunity()">Delete Community</button>
+      <button class="btn btn-secondary" onclick="closeCommModal()">Cancel</button>
+      <button class="btn btn-primary" id="cm-save-btn" onclick="saveComm()">Add Community</button>
+    </div>
+  </div>
+</div>
+
+<!-- REQUEST MODAL -->
+<!-- BULK LOT ENTRY -->
+<div class="overlay" id="bulk-add-modal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head"><div class="modal-title">Bulk Add Lots</div><button class="modal-x" onclick="closeBulkAdd()">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">Add a range of lots to a community at once. All lots will share the same block, tier, and status.</p>
+      <div class="fgrid">
+        <div class="fg"><label>Community *</label><select id="ba-comm" onchange="loadBATiers()"></select></div>
+        <div class="fg"><label>Block / Phase</label><input id="ba-block" placeholder="e.g. Phase 1, Block A"></div>
+        <div class="fg"><label>Lot # Start *</label><input type="number" id="ba-start" placeholder="e.g. 1" min="1"></div>
+        <div class="fg"><label>Lot # End *</label><input type="number" id="ba-end" placeholder="e.g. 45" min="1"></div>
+        <div class="fg"><label>Status</label>
+          <select id="ba-status"><option>Available</option><option>Pending</option><option>Sold</option></select>
+        </div>
+        <div class="fg"><label>Price Tier</label>
+          <select id="ba-tier" onchange="applyBATier()"><option value="">No tier — custom</option></select>
+        </div>
+        <div class="fg"><label>List Price ($)</label><input type="number" id="ba-price" placeholder="0"></div>
+        <div class="fg"><label>Deposit Credit ($)</label><input type="number" id="ba-deposit" placeholder="0"></div>
+        <div class="fg"><label>Builder / Buyer</label><input id="ba-buyer" placeholder="e.g. DR Horton"></div>
+        <div class="fg"><label>Market</label><input id="ba-market" placeholder="e.g. Phoenix"></div>
+        <div class="fg"><label>Expected Closing</label><input type="date" id="ba-closing"></div>
+        <div class="fg full" id="ba-preview-wrap" style="display:none">
+          <div id="ba-preview" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);background:var(--avail-bg);border:1px solid var(--avail);border-radius:5px;padding:8px 12px;line-height:1.9"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeBulkAdd()">Cancel</button>
+      <button class="btn btn-secondary" onclick="previewBulkAdd()">Preview</button>
+      <button class="btn btn-primary" onclick="confirmBulkAdd()">Add Lots</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="overlay" id="export-modal">
+  <div class="modal" style="width:500px">
+    <div class="modal-head">
+      <div class="modal-title">Export Data</div>
+      <button class="modal-x" onclick="closeExportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <div style="background:var(--surface2);border-radius:7px;padding:14px 16px">
+          <div style="font-family:'Libre Baskerville',serif;font-size:14px;color:var(--accent);margin-bottom:6px">📊 Full Data Export (.xlsx)</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7">
+            Multi-sheet Excel workbook containing all your data:<br>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">Lots &nbsp;·&nbsp; Communities &nbsp;·&nbsp; Takedown Schedule &nbsp;·&nbsp; Status Summary</span>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="exportFullXLSX()">⬇ Download Full Data Export</button>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:7px;padding:14px 16px">
+          <div style="font-family:'Libre Baskerville',serif;font-size:14px;color:var(--accent);margin-bottom:6px">📋 Summary Report (.xlsx)</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7">
+            Formatted report for sharing with investors or partners:<br>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">Portfolio KPIs &nbsp;·&nbsp; Community Breakdown &nbsp;·&nbsp; Pending by Builder &nbsp;·&nbsp; Upcoming Takedowns</span>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="exportSummaryReport()">⬇ Download Summary Report</button>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:7px;padding:14px 16px">
+          <div style="font-family:'Libre Baskerville',serif;font-size:14px;color:var(--accent);margin-bottom:6px">📄 Lots CSV (current filters)</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7">
+            Flat CSV of lot inventory — respects whatever filters are currently active in the Lot Inventory view.
+          </div>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="exportCSV();closeExportModal()">⬇ Download Lots CSV</button>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeExportModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLEAR DATA CONFIRMATION -->
+<div class="overlay" id="clear-modal">
+  <div class="modal" style="width:440px">
+    <div class="modal-head">
+      <div class="modal-title" style="color:var(--danger)">⚠ Clear All Data</div>
+      <button class="modal-x" onclick="closeClearModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;line-height:1.8;color:var(--ink2);margin-bottom:16px">
+        This will permanently delete <strong>everything</strong> in the current session:
+      </p>
+      <div style="background:var(--danger-bg);border:1px solid var(--danger);border-radius:6px;padding:12px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--danger)">
+        <div id="clear-modal-stats"></div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7">
+        This cannot be undone. If you want to keep your data, use <strong>Export CSV</strong> first before clearing.
+      </p>
+      <div style="margin-top:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;color:var(--ink2)">
+          <input type="checkbox" id="clear-confirm-check"> I understand this will delete all data and cannot be undone
+        </label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeClearModal()">Cancel</button>
+      <button class="btn btn-danger" id="clear-confirm-btn" onclick="confirmClearAll()">Delete Everything</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAKEDOWN MODAL -->
+<div class="overlay" id="td-modal">
+  <div class="modal" style="width:480px">
+    <div class="modal-head"><div class="modal-title" id="td-modal-title">Add Takedown Entry</div><button class="modal-x" onclick="closeTDModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="fg"><label>Community *</label><select id="td-comm"></select></div>
+        <div class="fg"><label>Scheduled Date *</label><input type="date" id="td-date"></div>
+        <div class="fg"><label>Tier / Lot Type</label><input id="td-tier" placeholder="e.g. Standard, Premium"></div>
+        <div class="fg"><label>Number of Lots Due *</label><input type="number" id="td-count" min="1" placeholder="e.g. 10"></div>
+        <div class="fg full"><label>Notes</label><textarea id="td-notes" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger btn-sm" id="td-del" style="display:none;margin-right:auto" onclick="deleteTD()">Delete</button>
+      <button class="btn btn-secondary" onclick="closeTDModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTD()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAKEDOWN IMPORT MODAL -->
+<div class="overlay" id="td-import-modal">
+  <div class="modal" style="width:640px">
+    <div class="modal-head"><div class="modal-title">Import Takedown Schedule</div><button class="modal-x" onclick="closeTDImport()">✕</button></div>
+    <div class="modal-body">
+
+      <!-- Format tabs -->
+      <div style="display:flex;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <div id="td-tab-excel" onclick="setTDTab('excel')" style="flex:1;padding:9px 14px;text-align:center;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--accent);color:#e8e4d8;font-weight:500">📊 Your Excel Format</div>
+        <div id="td-tab-csv" onclick="setTDTab('csv')" style="flex:1;padding:9px 14px;text-align:center;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--surface2);color:var(--muted)">📄 Generic CSV</div>
+      </div>
+
+      <!-- Excel format panel -->
+      <div id="td-panel-excel">
+        <div style="background:var(--surface2);border-radius:6px;padding:14px 16px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--ink2)">
+          <strong style="font-size:12px;color:var(--accent)">Your Excel format — upload directly</strong><br>
+          Upload your standard takedown schedule Excel file (.xlsx). The importer reads the <strong>Lot Sales</strong> sheet and automatically:<br>
+          <span style="color:var(--muted)">· Detects all lot type columns (Designer, Masterpiece, etc.) as tiers</span><br>
+          <span style="color:var(--muted)">· Reads the price per tier from row 2</span><br>
+          <span style="color:var(--muted)">· Creates one takedown entry per option period per lot type</span><br>
+          <span style="color:var(--muted)">· Skips the TOTALS row automatically</span>
+        </div>
+        <div style="margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)">
+          Which community does this schedule belong to?
+        </div>
+        <select id="td-import-comm" class="finput" style="width:100%;margin-bottom:14px">
+          <option value="">Select community…</option>
+        </select>
+        <div class="dropzone" id="td-dropzone-xl" onclick="document.getElementById('td-xlsx').click()">
+          <div style="font-size:28px;margin-bottom:8px">📊</div>
+          <div style="font-weight:500">Click to choose Excel file or drag & drop</div>
+          <div style="font-size:11px;margin-top:4px;color:var(--muted)">Accepts .xlsx files</div>
+        </div>
+        <input type="file" id="td-xlsx" accept=".xlsx" style="display:none" onchange="handleTDExcel(event)">
+      </div>
+
+      <!-- CSV format panel -->
+      <div id="td-panel-csv" style="display:none">
+        <div style="background:var(--surface2);border-radius:6px;padding:14px 16px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--ink2)">
+          <strong style="font-size:12px;color:var(--accent)">Generic CSV format</strong><br>
+          Columns: <span style="color:var(--muted)">community &nbsp;·&nbsp; date &nbsp;·&nbsp; tier &nbsp;·&nbsp; count &nbsp;·&nbsp; notes</span><br>
+          Date format: YYYY-MM-DD
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:14px">
+          <button class="btn btn-secondary btn-sm" onclick="downloadTDTemplate()">⬇ Download Template CSV</button>
+        </div>
+        <div class="dropzone" id="td-dropzone" onclick="document.getElementById('td-csv').click()">
+          <div style="font-size:28px;margin-bottom:8px">📂</div>
+          <div style="font-weight:500">Click to choose CSV or drag & drop</div>
+          <div style="font-size:11px;margin-top:4px;color:var(--muted)">Accepts .csv files</div>
+        </div>
+        <input type="file" id="td-csv" accept=".csv,.txt" style="display:none" onchange="handleTDImport(event)">
+      </div>
+
+      <!-- Shared preview area -->
+      <div id="td-preview" style="margin-top:14px;display:none">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;margin-bottom:8px;color:var(--accent)" id="td-preview-label"></div>
+        <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead id="td-preview-head" style="background:var(--surface2);position:sticky;top:0"></thead>
+            <tbody id="td-preview-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px">
+          <label style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer">
+            <input type="checkbox" id="td-clear-first"> Clear existing takedown schedule before import
+          </label>
+        </div>
+      </div>
+
+      <div id="td-import-msg" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeTDImport()">Cancel</button>
+      <button class="btn btn-primary" id="td-confirm-btn" style="display:none" onclick="confirmTDImport()">Import Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="overlay" id="import-modal">
+  <div class="modal" style="width:620px">
+    <div class="modal-head"><div class="modal-title">Import Lots from CSV / Excel</div><button class="modal-x" onclick="closeImportModal()">✕</button></div>
+    <div class="modal-body">
+
+      <div style="background:var(--surface2);border-radius:6px;padding:14px 16px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--ink2)">
+        <strong style="font-size:12px;color:var(--accent)">Expected columns</strong> (column names are flexible — the importer will match common variations):<br>
+        <span style="color:var(--muted)">community &nbsp;·&nbsp; lotNumber &nbsp;·&nbsp; block &nbsp;·&nbsp; status &nbsp;·&nbsp; listPrice &nbsp;·&nbsp; depositCredit &nbsp;·&nbsp; buyer &nbsp;·&nbsp; market &nbsp;·&nbsp; tier &nbsp;·&nbsp; closingDate &nbsp;·&nbsp; notes</span><br>
+        <strong style="color:var(--accent)">From Excel:</strong> Save your sheet as <em>CSV (Comma delimited)</em> then upload here.<br>
+        <strong style="color:var(--accent)">Status values:</strong> Available &nbsp;·&nbsp; Pending &nbsp;·&nbsp; Sold &nbsp;&nbsp;<span style="color:var(--muted)">(anything else defaults to Available)</span>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">⬇ Download Template CSV</button>
+        <span style="color:var(--muted);font-size:11px;align-self:center">Start from a pre-formatted template</span>
+      </div>
+
+      <div class="dropzone" id="import-dropzone" onclick="document.getElementById('import-file').click()">
+        <div style="font-size:28px;margin-bottom:8px">📂</div>
+        <div style="font-weight:500">Click to choose file or drag & drop here</div>
+        <div style="font-size:11px;margin-top:4px;color:var(--muted)">Accepts .csv files (export from Excel as CSV)</div>
+      </div>
+      <input type="file" id="import-file" accept=".csv,.txt" style="display:none" onchange="handleImport(event)">
+
+      <div id="import-preview" style="margin-top:14px;display:none">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;margin-bottom:8px;color:var(--accent)" id="import-preview-label"></div>
+        <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead id="import-preview-head" style="background:var(--surface2);position:sticky;top:0"></thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <label style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer">
+            <input type="checkbox" id="import-clear-first"> Clear existing lots before import
+          </label>
+        </div>
+      </div>
+
+      <div id="import-msg" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="import-confirm-btn" style="display:none" onclick="confirmImport()">Import Lots</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="overlay" id="export-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-head"><div class="modal-title">Export Data</div><button class="modal-x" onclick="closeExportModal()">✕</button></div>
+    <div class="modal-body">
+
+      <!-- Full Data Export -->
+      <div style="margin-bottom:20px">
+        <div style="font-family:'Libre Baskerville',serif;font-size:15px;color:var(--accent);margin-bottom:6px">Full Data Export</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+          Complete multi-sheet Excel workbook with all your data. Use this for backups and re-importing.
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--ink2);margin-bottom:12px">
+          <strong>Sheets included:</strong><br>
+          📋 Lots — all lot data including status, pricing, QB Entry, Docs Sent<br>
+          🏘 Communities — name, location, market, tiers<br>
+          📅 Takedown Schedule — all schedule entries<br>
+          🗃 Archive — completed communities with snapshots
+        </div>
+        <button class="btn btn-primary" onclick="exportFullXLSX()">⬇ Download Full Export (.xlsx)</button>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:20px">
+        <div style="font-family:'Libre Baskerville',serif;font-size:15px;color:var(--accent);margin-bottom:6px">Summary Report</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+          Formatted Excel report for sharing with investors, partners, or your team. Clean presentation of portfolio status and financials.
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--ink2);margin-bottom:12px">
+          <strong>Report includes:</strong><br>
+          📊 Portfolio Overview — KPIs, total values by status<br>
+          🏘 Community Breakdown — per-community lot counts and values<br>
+          ⏳ Pending Lots — by builder with closing dates and docs status<br>
+          📅 Upcoming Takedowns — next 90 days with alert status<br>
+          🗃 Archive Summary — closed communities
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="exportSummaryReport()">⬇ Download Summary Report (.xlsx)</button>
+          <button class="btn btn-secondary" onclick="exportCSV()">⬇ Lots Only (.csv)</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeExportModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" style="position:fixed;inset:0;background:var(--accent);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
+  <div style="font-family:'Libre Baskerville',serif;font-size:28px;color:#e8e4d8;letter-spacing:.5px">LotLedger <sup style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--gold)">PRO</sup></div>
+  <div id="loading-msg" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(232,228,216,.6);letter-spacing:.5px">Signing in to Microsoft…</div>
+  <div style="width:200px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden">
+    <div id="loading-bar" style="height:100%;background:var(--gold);border-radius:2px;width:0%;transition:width .4s ease"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────────
+var C=[], L=[], R=[], TD=[], LOG=[];
+var editLotId=null, editTDId=null;
+var activePg='dashboard', reqTab='pending';
+var commFilter='';
+var lotSort={k:'community',d:1}, csSort={k:'name',d:1};
+var sel=new Set();
+var curPage=1, pageSize=100, totalPages=1;
+
+// ── UTILS ──────────────────────────────────────────────────────────────────────
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function fmt(n){if(!n&&n!==0)return'—';return'$'+Number(n).toLocaleString()}
+function fmtD(d){if(!d)return'—';var p=d.split('-');return p[1]+'/'+p[2]+'/'+p[0].slice(2)}
+function cn(id){var c=C.find(x=>x.id===id);return c?c.name:'—'}
+function chipCls(s){return s==='Available'?'chip-a':s==='Pending'?'chip-p':'chip-s'}
+function chip(s){return'<span class="chip '+chipCls(s)+'">'+s+'</span>'}
+function gv(id){var e=document.getElementById(id);return e?e.value||'':''}
+function sv(id,v){var e=document.getElementById(id);if(e)e.value=v||''}
+function log(msg){LOG.unshift({ts:Date.now(),msg:msg})}
+
+// ── SEED ───────────────────────────────────────────────────────────────────────
+function seed(){
+  var defs=[
+    ['Meadow Creek','Gilbert, AZ','Phoenix'],['Sunstone Ranch','Queen Creek, AZ','Phoenix'],
+    ['Canyon Ridge','Chandler, AZ','Phoenix'],['Ironwood Estates','Mesa, AZ','Phoenix'],
+    ['Copper Springs','Surprise, AZ','Phoenix'],['Desert Willow','Goodyear, AZ','Phoenix']
+  ];
+  defs.forEach(function(d){
+    C.push({id:uid(),name:d[0],location:d[1],market:d[2],totalPlanned:30,notes:'',
+      tiers:[
+        {name:'Standard',listPrice:72000,depositCredit:6000,bankRelease:58000},
+        {name:'Premium', listPrice:85000,depositCredit:7500,bankRelease:68000},
+        {name:'Corner',  listPrice:92000,depositCredit:8000,bankRelease:74000}
+      ]
+    });
+  });
+  var statuses=['Available','Available','Available','Pending','Pending','Sold','Sold','Available'];
+  var builders=['DR Horton','Meritage Homes','Pulte Homes','Taylor Morrison','Lennar','KB Home'];
+  var phases=['Phase 1','Phase 1','Phase 2','Phase 2','Block A','Block B'];
+  var tnames=['Standard','Standard','Premium','Corner','Standard',''];
+  C.forEach(function(c,ci){
+    for(var i=1;i<=12;i++){
+      var st=statuses[(i+ci)%statuses.length];
+      var bl=builders[i%builders.length];
+      var tier=tnames[i%tnames.length];
+      var t=tier?c.tiers.find(function(x){return x.name===tier}):null;
+      L.push({
+        id:uid(),community:c.id,
+        lotNumber:String(i),
+        block:phases[i%phases.length],
+        status:st,
+        listPrice:   t?t.listPrice   :62000+Math.round(Math.random()*30000/1000)*1000,
+        depositCredit:t?t.depositCredit:5000+Math.round(Math.random()*3000/500)*500,
+        buyer:st==='Available'?'':bl,
+        market:st==='Available'?'':c.market,
+        tier:tier,
+        contractDate:st!=='Available'?'2026-0'+((i%3)+1)+'-15':'',
+        closingDate:(st==='Pending'||st==='Sold')?'2026-'+String((i%5)+4).padStart(2,'0')+'-28':'',
+        notes:''
+      });
+    }
+  });
+  R=[
+    {id:uid(),buyer:'DR Horton',community:C[0].id,lots:'7, 8, 9',date:'2026-04-01',closing:'2026-07-01',contact:'Jim Raleigh',email:'j.raleigh@drh.com',notes:'Contingent on plat recordation',status:'open'},
+    {id:uid(),buyer:'Pulte Homes',community:C[1].id,lots:'3, 4',date:'2026-04-05',closing:'2026-08-15',contact:'Sarah Cole',email:'s.cole@pulte.com',notes:'',status:'open'},
+    {id:uid(),buyer:'Meritage Homes',community:C[2].id,lots:'1',date:'2026-03-18',closing:'2026-06-01',contact:'',email:'',notes:'',status:'executed'}
+  ];
+  var today=new Date();
+  function dOut(d){return new Date(today.getTime()+d*86400000).toISOString().slice(0,10)}
+  TD=[
+    {id:uid(),community:C[0].id,date:dOut(10), tier:'Standard',count:6,notes:'Phase 1 final takedown'},
+    {id:uid(),community:C[0].id,date:dOut(45), tier:'Premium', count:4,notes:''},
+    {id:uid(),community:C[1].id,date:dOut(22), tier:'Standard',count:8,notes:'Block A completion'},
+    {id:uid(),community:C[1].id,date:dOut(90), tier:'Standard',count:10,notes:''},
+    {id:uid(),community:C[2].id,date:dOut(5),  tier:'',        count:5,notes:'Urgent — builder needs lots'},
+    {id:uid(),community:C[3].id,date:dOut(120),tier:'Standard',count:12,notes:'Phase 2 kickoff'},
+    {id:uid(),community:C[4].id,date:dOut(-30),tier:'Standard',count:6,notes:'Past takedown'}
+  ];
+  LOG=[{ts:Date.now(),msg:'Demo data loaded — <strong>72 lots</strong> across 6 communities'}];
+
+  // Seed one archived community for demo
+  var archComm={id:uid(),name:'Ironwood Crossing',location:'Tempe, AZ',market:'Phoenix',totalPlanned:20,notes:'',archived:true,archivedDate:'2025-11-15',
+    tiers:[{name:'Standard',listPrice:68000,depositCredit:5500}],
+    snapshot:{totalLots:20,listVal:1420000,depVal:115000,builders:'DR Horton, Lennar'}
+  };
+  C.push(archComm);
+  for(var ai=1;ai<=20;ai++){
+    L.push({id:uid(),community:archComm.id,lotNumber:String(ai),block:'Phase 1',status:'Sold',
+      listPrice:68000+Math.round(Math.random()*10000/1000)*1000,depositCredit:5500,
+      buyer:ai%2===0?'DR Horton':'Lennar',market:'Phoenix',tier:'Standard',
+      contractDate:'2025-09-01',closingDate:'2025-11-'+String(ai%28+1).padStart(2,'0'),notes:'',qbEntry:true});
+  }
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function nav(pg,el){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+  document.getElementById('page-'+pg).classList.add('active');
+  if(el)el.classList.add('active');
+  activePg=pg;
+  render();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render(){
+  renderSidebar();
+  refreshDropdowns();
+  if(activePg==='dashboard') renderDash();
+  if(activePg==='lots')      renderLots();
+  if(activePg==='requests')  renderReqs();
+  if(activePg==='calendar')  renderCalendar();
+  if(activePg==='takedown')  renderTakedown();
+  if(activePg==='archive')   renderArchive();
+  if(activePg==='log')       renderLog();
+}
+
+function renderSidebar(){
+  var q=(gv('sb-search')||'').toLowerCase();
+  var active=C.filter(function(c){return !c.archived});
+  var html=active.filter(function(c){return !q||c.name.toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)})
+    .map(function(c){
+      var cl=L.filter(function(l){return l.community===c.id});
+      var av=cl.filter(function(l){return l.status==='Available'}).length;
+      var pe=cl.filter(function(l){return l.status==='Pending'}).length;
+      var so=cl.filter(function(l){return l.status==='Sold'}).length;
+      return '<div class="comm-row'+(commFilter===c.id?' active':'')+'" onclick="jumpComm(\''+c.id+'\')">'+
+        '<div class="comm-name" title="'+c.name+'">'+c.name+'</div>'+
+        '<div style="display:flex;align-items:center;gap:4px">'+
+          '<div class="cbadges">'+
+            '<span class="cbadge cb-a">'+av+'</span>'+
+            '<span class="cbadge cb-p">'+pe+'</span>'+
+            '<span class="cbadge cb-s">'+so+'</span>'+
+          '</div>'+
+          '<button onclick="event.stopPropagation();openCommModal(\''+c.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:1px 3px;border-radius:3px;line-height:1" title="Edit community">✎</button>'+
+        '</div></div>';
+    }).join('');
+  document.getElementById('comm-scroll').innerHTML=html||'<div style="padding:10px 14px;color:var(--muted);font-size:11px">No active communities</div>';
+  // Show archived count hint
+  var archivedCount=C.filter(function(c){return c.archived}).length;
+  var hint=document.getElementById('sb-archived-hint');
+  if(hint)hint.textContent=archivedCount?archivedCount+' archived':'';
+}
+
+function refreshDropdowns(){
+  // Only active (non-archived) communities in dropdowns
+  var active=C.filter(function(c){return !c.archived});
+  var opts=active.map(function(c){return'<option value="'+c.id+'">'+c.name+'</option>'}).join('');
+  var allOpts='<option value="">All Communities</option>'+opts;
+  ['td-comm-filter'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(!e)return; var v=e.value; e.innerHTML=allOpts; if(v)e.value=v;
+  });
+  ['lm-comm','td-comm'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(!e)return; var v=e.value; e.innerHTML=opts; if(v)e.value=v;
+  });
+}
+
+// DASHBOARD
+function renderDash(){
+  var activeLots=L.filter(function(l){var c=C.find(function(x){return x.id===l.community});return c&&!c.archived});
+  var total=activeLots.length;
+  function byS(s){return activeLots.filter(function(l){return l.status===s}).length}
+  function sum(k){return activeLots.reduce(function(a,l){return a+Number(l[k]||0)},0)}
+  var activeComms=C.filter(function(c){return !c.archived});
+  document.getElementById('dash-sub').textContent=activeComms.length+' active communities · '+total+' lots · '+new Date().toLocaleTimeString();
+  document.getElementById('kpi-row').innerHTML=
+    kpi('kpi-to','Total Lots',total,activeComms.length+' active communities')+
+    kpi('kpi-av','Available',byS('Available'),Math.round(byS('Available')/total*100||0)+'% of inventory')+
+    kpi('kpi-pe','Pending',byS('Pending'),'')+
+    kpi('kpi-so','Sold',byS('Sold'),'')+
+    kpi('kpi-to kpi-sm','Portfolio List Value',fmt(sum('listPrice')),'Active only')+
+    kpi('kpi-to kpi-sm','Total Deposit Credits',fmt(sum('depositCredit')),'');
+  renderDashAlerts();
+  renderCommSummary();
+  renderStatusSummary('dash', activeLots);
+  renderDashReqs();
+}
+
+function kpi(cls,label,val,sub){
+  return'<div class="kpi '+cls+'"><div class="kpi-label">'+label+'</div><div class="kpi-val">'+val+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>';
+}
+
+function renderDashAlerts(){
+  var win=30;
+  var active=TD.filter(function(td){var s=tdStatus(td,win);return s.level==='urgent'||s.level==='warn'}).sort(function(a,b){return a.date.localeCompare(b.date)});
+  var card=document.getElementById('alerts-card');
+  var body=document.getElementById('dash-alerts');
+  if(!active.length){card.style.display='none';return}
+  card.style.display='';
+  body.innerHTML=active.map(function(td){
+    var s=tdStatus(td,win);
+    var urg=s.level==='urgent';
+    return'<div class="alert-card">'+
+      '<div class="adot '+(urg?'adot-red':'adot-yel')+'"></div>'+
+      '<div class="alert-main">'+
+        '<div class="alert-hl">'+cn(td.community)+(td.tier?' · '+td.tier:'')+'</div>'+
+        '<div class="alert-meta">Due <strong>'+fmtD(td.date)+'</strong> ('+
+          (s.daysAway===0?'TODAY':s.daysAway+'d')+') · '+
+          s.taken+' of '+td.count+' taken · <strong>'+s.remaining+' remaining</strong>'+
+          (td.notes?' · '+td.notes:'')+'</div>'+
+      '</div>'+
+      '<span class="abadge '+(urg?'abadge-red':'abadge-yel')+'">'+(urg?'⚠ URGENT':'◉ DUE SOON')+'</span>'+
+    '</div>';
+  }).join('');
+}
+
+var csFilter='';
+function renderCommSummary(){
+  var q=(document.getElementById('comm-filter-dash')||{}).value||'';
+  var data=C.filter(function(c){return !c.archived}).map(function(c){
+    var cl=L.filter(function(l){return l.community===c.id});
+    return{id:c.id,name:c.name,location:c.location||'',total:cl.length,
+      avail:cl.filter(function(l){return l.status==='Available'}).length,
+      pend: cl.filter(function(l){return l.status==='Pending'}).length,
+      sold: cl.filter(function(l){return l.status==='Sold'}).length,
+      listVal:cl.reduce(function(a,l){return a+Number(l.listPrice||0)},0),
+      depVal: cl.reduce(function(a,l){return a+Number(l.depositCredit||0)},0)
+    };
+  }).filter(function(c){return !q||c.name.toLowerCase().includes(q.toLowerCase())});
+  var k=csSort.k,d=csSort.d;
+  data.sort(function(a,b){return a[k]<b[k]?-d:a[k]>b[k]?d:0});
+  document.getElementById('cs-body').innerHTML=data.map(function(c){
+    var allSold=c.total>0&&c.sold===c.total;
+    return'<tr'+(allSold?' style="background:var(--sold-bg)"':'')+'>'+
+      '<td><strong>'+c.name+'</strong><br><span style="color:var(--muted);font-size:11px">'+c.location+'</span></td>'+
+      '<td class="r mono">'+c.total+'</td>'+
+      '<td class="r" style="color:var(--avail)">'+c.avail+'</td>'+
+      '<td class="r" style="color:var(--pend)">'+c.pend+'</td>'+
+      '<td class="r" style="color:var(--sold)">'+c.sold+'</td>'+
+      '<td class="r mono">'+fmt(c.listVal)+'</td>'+
+      '<td class="r mono">'+fmt(c.depVal)+'</td>'+
+      '<td style="display:flex;gap:5px;justify-content:flex-end">'+
+        '<button class="btn btn-xs btn-secondary" onclick="jumpComm(\''+c.id+'\')">View →</button>'+
+        '<button class="btn btn-xs btn-secondary" onclick="openCommModal(\''+c.id+'\')">Edit</button>'+
+        (allSold?'<button class="btn btn-xs btn-primary" onclick="promptArchive(\''+c.id+'\')">Archive</button>':'')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+  var tots=data.reduce(function(a,c){return{total:a.total+c.total,listVal:a.listVal+c.listVal,depVal:a.depVal+c.depVal}},{total:0,listVal:0,depVal:0});
+  document.getElementById('cs-foot').innerHTML='<td><strong>TOTALS</strong></td><td class="r">'+tots.total+'</td><td class="r" colspan="3"></td><td class="r">'+fmt(tots.listVal)+'</td><td class="r">'+fmt(tots.depVal)+'</td><td></td>';
+}
+function sortCS(k){if(csSort.k===k)csSort.d*=-1;else{csSort.k=k;csSort.d=1}renderCommSummary()}
+
+function renderDashReqs(){
+  // Show communities that have pending lots
+  var commWithPending=C.filter(function(c){
+    return !c.archived&&L.some(function(l){return l.community===c.id&&l.status==='Pending'});
+  });
+  var el=document.getElementById('dash-reqs');
+  if(!commWithPending.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>No pending lots at this time</div>';return;
+  }
+  el.innerHTML=commWithPending.slice(0,4).map(function(c){
+    var pending=L.filter(function(l){return l.community===c.id&&l.status==='Pending'});
+    return'<div style="padding:10px 16px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-weight:500;margin-bottom:4px">'+c.name+
+        '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;background:var(--pend-bg);color:var(--pend);padding:2px 7px;border-radius:3px;margin-left:8px">'+pending.length+' pending</span>'+
+      '</div>'+
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--muted)">'+
+        'Lots: '+pending.map(function(l){return l.lotNumber||'TBD'}).join(', ')+
+      '</div>'+
+    '</div>';
+  }).join('');
+  if(commWithPending.length>4){
+    el.innerHTML+='<div style="text-align:center;padding:10px">'+
+      '<button class="btn btn-secondary btn-sm" onclick="nav(\'requests\',document.querySelector(\'[data-pg=requests]\'))">View all →</button></div>';
+  }
+}
+
+// REQUESTS — read-only, derived from lot data
+function renderReqs(){
+  var cf=(document.getElementById('req-comm-filter')||{}).value||'';
+  // Update community filter dropdown
+  var rcf=document.getElementById('req-comm-filter');
+  if(rcf){
+    var v=rcf.value;
+    rcf.innerHTML='<option value="">All Communities</option>'+
+      C.filter(function(c){return !c.archived}).map(function(c){return'<option value="'+c.id+'">'+c.name+'</option>'}).join('');
+    rcf.value=v;
+  }
+
+  var activeCommunities=C.filter(function(c){
+    return !c.archived&&(!cf||c.id===cf);
+  });
+
+  var sections=activeCommunities.map(function(c){
+    var pending=L.filter(function(l){return l.community===c.id&&l.status==='Pending'});
+    if(!pending.length)return null;
+
+    // Group by builder
+    var byBuilder={};
+    pending.forEach(function(l){
+      var b=l.buyer||'Unassigned';
+      if(!byBuilder[b])byBuilder[b]=[];
+      byBuilder[b].push(l);
+    });
+
+    var builderRows=Object.keys(byBuilder).map(function(builder){
+      var lots=byBuilder[builder];
+      var closingDates=[...new Set(lots.map(function(l){return l.closingDate}).filter(Boolean))];
+      var docsSentCount=lots.filter(function(l){return l.docsSent}).length;
+      return'<tr>'+
+        '<td style="padding:9px 14px;font-weight:500">'+builder+'</td>'+
+        '<td style="padding:9px 14px;font-family:\'IBM Plex Mono\',monospace">'+
+          lots.map(function(l){return'<span style="background:var(--pend-bg);color:var(--pend);padding:1px 6px;border-radius:3px;margin-right:3px;font-size:11px">'+(l.lotNumber||'TBD')+'</span>'}).join('')+
+        '</td>'+
+        '<td style="padding:9px 14px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--muted)">'+
+          (closingDates.length?closingDates.map(fmtD).join(', '):'—')+
+        '</td>'+
+        '<td style="padding:9px 14px;text-align:center">'+
+          (docsSentCount===lots.length
+            ?'<span style="color:var(--avail);font-family:\'IBM Plex Mono\',monospace;font-size:11px">✓ All sent</span>'
+            :docsSentCount>0
+              ?'<span style="color:var(--gold);font-family:\'IBM Plex Mono\',monospace;font-size:11px">'+docsSentCount+'/'+lots.length+' sent</span>'
+              :'<span style="color:var(--muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px">—</span>')+
+        '</td>'+
+        '<td style="padding:9px 14px;text-align:right;font-family:\'IBM Plex Mono\',monospace;font-size:11px">'+
+          fmt(lots.reduce(function(a,l){return a+Number(l.listPrice||0)},0))+
+        '</td>'+
+      '</tr>';
+    }).join('');
+
+    var totalVal=pending.reduce(function(a,l){return a+Number(l.listPrice||0)},0);
+    return'<div class="card" style="margin-bottom:16px">'+
+      '<div class="card-head">'+
+        '<div>'+
+          '<div class="card-title">'+c.name+'</div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+(c.location||'')+(c.market?' · '+c.market:'')+'</div>'+
+        '</div>'+
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--pend);background:var(--pend-bg);padding:4px 12px;border-radius:4px">'+
+          pending.length+' lot'+(pending.length!==1?'s':'')+' pending'+
+        '</div>'+
+      '</div>'+
+      '<div class="tbl-wrap">'+
+        '<table>'+
+          '<thead><tr>'+
+            '<th style="padding:8px 14px">Builder / Buyer</th>'+
+            '<th style="padding:8px 14px">Lots</th>'+
+            '<th style="padding:8px 14px">Expected Closing</th>'+
+            '<th style="padding:8px 14px;text-align:center">Docs Sent</th>'+
+            '<th style="padding:8px 14px;text-align:right">Total Value</th>'+
+          '</tr></thead>'+
+          '<tbody>'+builderRows+'</tbody>'+
+          '<tfoot><tr style="background:var(--surface2);font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:500">'+
+            '<td style="padding:8px 14px" colspan="4">'+pending.length+' lots total</td>'+
+            '<td style="padding:8px 14px;text-align:right;color:var(--accent)">'+fmt(totalVal)+'</td>'+
+          '</tr></tfoot>'+
+        '</table>'+
+      '</div>'+
+    '</div>';
+  }).filter(Boolean);
+
+  document.getElementById('req-list').innerHTML=sections.length
+    ?sections.join('')
+    :'<div class="empty"><div class="empty-icon">📋</div>No pending lots'+(cf?' in this community':'')+'</div>';
+}
+
+
+
+// LOTS
+function filteredLots(){
+  var q=(gv('lot-search')||'').toLowerCase();
+  // column filters
+  var cfComm=gv('cf-community');
+  var cfBuyer=gv('cf-buyer');
+  var cfMarket=gv('cf-market');
+  var cfLot=(gv('cf-lot')||'').toLowerCase();
+  var cfBlock=gv('cf-block');
+  var cfStatus=gv('cf-status');
+  var cfDocs=gv('cf-docs');
+  var cfClosing=(gv('cf-closing')||'');
+  var cfTier=gv('cf-tier');
+  var cfQB=gv('cf-qb');
+
+  return L.filter(function(l){
+    var comm=C.find(function(c){return c.id===l.community});
+    if(!comm||comm.archived)return false;
+    var m=!q||cn(l.community).toLowerCase().includes(q)||(l.lotNumber||'').toLowerCase().includes(q)||
+          (l.buyer||'').toLowerCase().includes(q)||(l.block||'').toLowerCase().includes(q)||(l.market||'').toLowerCase().includes(q);
+    if(!m)return false;
+    // column filters
+    if(cfComm&&l.community!==cfComm)return false;
+    if(cfBuyer&&(l.buyer||'')!==cfBuyer)return false;
+    if(cfMarket&&(l.market||'')!==cfMarket)return false;
+    if(cfLot&&!(l.lotNumber||'').toLowerCase().includes(cfLot))return false;
+    if(cfBlock&&(l.block||'')!==cfBlock)return false;
+    if(cfStatus&&l.status!==cfStatus)return false;
+    if(cfDocs==='yes'&&!l.docsSent)return false;
+    if(cfDocs==='no'&&l.docsSent)return false;
+    if(cfClosing&&!(l.closingDate||'').startsWith(cfClosing))return false;
+    if(cfTier&&(l.tier||'')!==cfTier)return false;
+    if(cfQB==='yes'&&!l.qbEntry)return false;
+    if(cfQB==='no'&&l.qbEntry)return false;
+    return true;
+  });
+}
+
+function clearColFilters(){
+  ['cf-community','cf-buyer','cf-market','cf-lot','cf-block','cf-status','cf-docs','cf-closing','cf-tier','cf-qb','lot-search']
+    .forEach(function(id){sv(id,'')});
+  curPage=1;renderLots();
+}
+
+function populateColFilterDropdowns(){
+  // Only populate from active (non-archived) lots
+  var activeLots=L.filter(function(l){var c=C.find(function(x){return x.id===l.community});return c&&!c.archived;});
+  function uniqueVals(key,labelFn){
+    var vals=[...new Set(activeLots.map(function(l){return key==='community'?l.community:(l[key]||'')}).filter(Boolean))].sort();
+    return vals.map(function(v){return'<option value="'+v+'">'+(labelFn?labelFn(v):v)+'</option>'}).join('');
+  }
+  function setOpts(id,key,labelFn){
+    var el=document.getElementById(id);if(!el)return;
+    var v=el.value;
+    el.innerHTML='<option value="">All</option>'+uniqueVals(key,labelFn);
+    if(v)el.value=v;
+  }
+  setOpts('cf-community','community',function(id){return cn(id)});
+  setOpts('cf-buyer','buyer');
+  setOpts('cf-market','market');
+  setOpts('cf-block','block');
+  setOpts('cf-tier','tier');
+}
+
+function renderLots(){
+  populateColFilterDropdowns();
+  var data=filteredLots();
+  var k=lotSort.k,d=lotSort.d;
+  data.sort(function(a,b){
+    var av=k==='community'?cn(a.community):a[k]||'';
+    var bv=k==='community'?cn(b.community):b[k]||'';
+    if(!isNaN(Number(av))&&!isNaN(Number(bv))&&av!==''&&bv!==''){av=Number(av);bv=Number(bv)}
+    return av<bv?-d:av>bv?d:0;
+  });
+
+  // ── Pagination math ──────────────────────────────────────────────────────
+  totalPages=Math.max(1,Math.ceil(data.length/pageSize));
+  if(curPage>totalPages)curPage=totalPages;
+  if(curPage<1)curPage=1;
+  var start=(curPage-1)*pageSize;
+  var pageData=data.slice(start,start+pageSize);
+
+  // ── Title / sub ──────────────────────────────────────────────────────────
+  var cfComm=gv('cf-community');
+  var comm=cfComm?C.find(function(c){return c.id===cfComm}):null;
+  document.getElementById('lot-title').textContent=comm?comm.name:'Lot Inventory';
+  document.getElementById('lot-sub').textContent=
+    data.length+' lot'+(data.length!==1?'s':'')+' · showing '+(start+1)+'–'+Math.min(start+pageSize,data.length);
+
+  // ── Table rows (current page only) ──────────────────────────────────────
+  var tb=document.getElementById('lot-tbody');
+  if(!data.length){
+    tb.innerHTML='<tr><td colspan="15"><div class="empty"><div class="empty-icon">🏚</div>No lots match filters</div></td></tr>';
+    document.getElementById('lot-pagination').style.display='none';
+    renderStatusSummary('lot',data);
+    return;
+  }
+
+  tb.innerHTML=pageData.map(function(l){
+    var sp=Number(l.listPrice||0)-Number(l.depositCredit||0);
+    var tierBadge=l.tier?'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;background:var(--surface2);padding:2px 6px;border-radius:3px;color:var(--accent)">'+l.tier+'</span>':'—';
+    var isSold=l.status==='Sold';
+    var isPending=l.status==='Pending';
+    var qbChecked=l.qbEntry?'checked':'';
+    var qbDisabled=isSold?'':'disabled';
+    var qbOpacity=isSold?'1':'0.35';
+    var dsChecked=l.docsSent?'checked':'';
+    var dsDisabled=isPending?'':'disabled';
+    var dsOpacity=isPending?'1':'0.35';
+    return'<tr>'+
+      '<td><input type="checkbox" class="lcb" data-id="'+l.id+'" onchange="toggleSel(\''+l.id+'\',this.checked)"'+(sel.has(l.id)?' checked':'')+'></td>'+
+      '<td>'+cn(l.community)+'</td>'+
+      '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(l.buyer||'—')+'</td>'+
+      '<td style="color:var(--muted)">'+(l.market||'—')+'</td>'+
+      '<td class="mono"><strong>'+(l.lotNumber||'<span style="color:var(--muted)">TBD</span>')+'</strong></td>'+
+      '<td style="color:var(--muted)">'+(l.block||'<span style="color:var(--muted)">TBD</span>')+'</td>'+
+      '<td>'+chip(l.status)+'</td>'+
+      '<td><div class="toggle-wrap" style="opacity:'+dsOpacity+'" title="'+(isPending?'':'Mark lot as Pending to enable Docs Sent')+'">'+
+        '<label class="toggle"><input type="checkbox" '+dsChecked+' '+dsDisabled+' onchange="toggleDS(\''+l.id+'\',this.checked)"><span class="toggle-slider" style="cursor:'+(isPending?'pointer':'not-allowed')+'"></span></label>'+
+        '<span class="toggle-lbl">'+(isPending?(l.docsSent?'Yes':'No'):'—')+'</span>'+
+      '</div></td>'+
+      '<td class="mono" style="color:var(--muted)">'+fmtD(l.closingDate)+'</td>'+
+      '<td>'+tierBadge+'</td>'+
+      '<td class="r mono">'+fmt(l.listPrice)+'</td>'+
+      '<td class="r mono">'+fmt(l.depositCredit)+'</td>'+
+      '<td class="r mono" style="color:'+(sp>0?'var(--avail)':'var(--danger)')+'">'+( sp?fmt(sp):'—')+'</td>'+
+      '<td><div class="toggle-wrap" style="opacity:'+qbOpacity+'" title="'+(isSold?'':'Mark lot as Sold to enable QB Entry')+'">'+
+        '<label class="toggle"><input type="checkbox" '+qbChecked+' '+qbDisabled+' onchange="toggleQB(\''+l.id+'\',this.checked)"><span class="toggle-slider" style="cursor:'+(isSold?'pointer':'not-allowed')+'"></span></label>'+
+        '<span class="toggle-lbl">'+(isSold?(l.qbEntry?'Yes':'No'):'—')+'</span>'+
+      '</div></td>'+
+      '<td><button class="btn btn-xs btn-secondary" onclick="openLotModal(\''+l.id+'\')">Edit</button></td>'+
+    '</tr>';
+  }).join('');
+
+  // ── Tfoot totals (full filtered set, not just page) ──────────────────────
+  function s(key){return data.reduce(function(a,l){return a+Number(l[key]||0)},0)}
+  document.getElementById('lot-tfoot').innerHTML=
+    '<td colspan="10" style="color:var(--muted)">'+data.length+' total · page '+curPage+' of '+totalPages+'</td>'+
+    '<td class="r">'+fmt(s('listPrice'))+'</td>'+
+    '<td class="r">'+fmt(s('depositCredit'))+'</td>'+
+    '<td class="r">'+fmt(s('listPrice')-s('depositCredit'))+'</td>'+
+    '<td colspan="3"></td>';
+
+  // ── Pagination controls ──────────────────────────────────────────────────
+  var pgBar=document.getElementById('lot-pagination');
+  pgBar.style.display='flex';
+
+  document.getElementById('pg-info').textContent=
+    'Showing '+(start+1)+'–'+Math.min(start+pageSize,data.length)+' of '+data.length+' lots';
+
+  // Page number buttons — show up to 7 around current page
+  var nums='';
+  var range=3;
+  var lo=Math.max(1,curPage-range);
+  var hi=Math.min(totalPages,curPage+range);
+  if(lo>1)nums+='<button class="btn btn-secondary btn-sm" onclick="goPage(1)">1</button>'+(lo>2?'<span style="color:var(--muted);padding:0 4px;font-size:12px">…</span>':'');
+  for(var p=lo;p<=hi;p++){
+    nums+='<button class="btn btn-secondary btn-sm'+(p===curPage?' pg-btn-active':'')+'" onclick="goPage('+p+')">'+p+'</button>';
+  }
+  if(hi<totalPages)nums+=(hi<totalPages-1?'<span style="color:var(--muted);padding:0 4px;font-size:12px">…</span>':'')+'<button class="btn btn-secondary btn-sm" onclick="goPage('+totalPages+')">'+totalPages+'</button>';
+  document.getElementById('pg-numbers').innerHTML=nums;
+
+  // Disable first/prev/next/last appropriately
+  document.getElementById('pg-first').disabled=curPage===1;
+  document.getElementById('pg-prev').disabled=curPage===1;
+  document.getElementById('pg-next').disabled=curPage===totalPages;
+  document.getElementById('pg-last').disabled=curPage===totalPages;
+
+  // Status summary uses full filtered data
+  renderStatusSummary('lot',data);
+}
+
+function goPage(p){
+  p=Math.max(1,Math.min(p,totalPages));
+  if(p===curPage)return;
+  curPage=p;
+  // Scroll table into view smoothly
+  var card=document.querySelector('#page-lots .card');
+  if(card)card.scrollIntoView({behavior:'smooth',block:'start'});
+  renderLots();
+}
+
+function changePageSize(){
+  pageSize=parseInt(gv('pg-size'))||100;
+  curPage=1;
+  renderLots();
+}
+function sortL(k){if(lotSort.k===k)lotSort.d*=-1;else{lotSort.k=k;lotSort.d=1;}curPage=1;renderLots()}
+
+function renderStatusSummary(prefix, lots){
+  var statuses=['Available','Pending','Sold'];
+  var statusColors={'Available':'var(--avail)','Pending':'var(--pend)','Sold':'var(--sold)'};
+  var statusBg={'Available':'var(--avail-bg)','Pending':'var(--pend-bg)','Sold':'var(--sold-bg)'};
+  var total=lots.length;
+  var totalList=lots.reduce(function(a,l){return a+Number(l.listPrice||0)},0);
+  var totalDep=lots.reduce(function(a,l){return a+Number(l.depositCredit||0)},0);
+
+  var bodyEl=document.getElementById(prefix+'-status-summary')||document.getElementById(prefix+'-status-summary');
+  var footEl=document.getElementById(prefix+'-status-foot');
+  if(!bodyEl||!footEl)return;
+
+  bodyEl.innerHTML=statuses.map(function(st){
+    var sl=lots.filter(function(l){return l.status===st});
+    var count=sl.length;
+    var listVal=sl.reduce(function(a,l){return a+Number(l.listPrice||0)},0);
+    var depVal=sl.reduce(function(a,l){return a+Number(l.depositCredit||0)},0);
+    var net=listVal-depVal;
+    var pct=total>0?Math.round(count/total*100):0;
+    if(count===0)return'<tr>'+
+      '<td><span class="chip" style="background:'+statusBg[st]+';color:'+statusColors[st]+'">'+st+'</span></td>'+
+      '<td class="r mono" style="color:var(--muted)">0</td>'+
+      '<td class="r mono" style="color:var(--muted)">—</td>'+
+      '<td class="r mono" style="color:var(--muted)">—</td>'+
+      '<td class="r mono" style="color:var(--muted)">—</td>'+
+      '<td class="r mono" style="color:var(--muted)">—</td>'+
+    '</tr>';
+    return'<tr>'+
+      '<td><span class="chip" style="background:'+statusBg[st]+';color:'+statusColors[st]+'">'+st+'</span></td>'+
+      '<td class="r mono" style="color:'+statusColors[st]+';font-weight:500">'+count+'</td>'+
+      '<td class="r mono" style="color:var(--muted)">'+pct+'%</td>'+
+      '<td class="r mono">'+fmt(listVal)+'</td>'+
+      '<td class="r mono">'+fmt(depVal)+'</td>'+
+      '<td class="r mono" style="color:'+(net>0?'var(--avail)':'var(--danger)')+'">'+fmt(net)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var totalNet=totalList-totalDep;
+  footEl.innerHTML=
+    '<td><strong>ALL</strong></td>'+
+    '<td class="r">'+total+'</td>'+
+    '<td class="r">100%</td>'+
+    '<td class="r">'+fmt(totalList)+'</td>'+
+    '<td class="r">'+fmt(totalDep)+'</td>'+
+    '<td class="r" style="color:'+(totalNet>0?'var(--avail)':'var(--danger)')+'">'+fmt(totalNet)+'</td>';
+}
+function jumpComm(id){nav('lots',document.querySelector('[data-pg=lots]'));sv('cf-community',id);renderLots()}
+
+// bulk
+function toggleSel(id,v){if(v)sel.add(id);else sel.delete(id);updateBulk()}
+function toggleAll(cb){var fl=filteredLots();if(cb.checked)fl.forEach(function(l){sel.add(l.id)});else sel.clear();renderLots();updateBulk()}
+function updateBulk(){var bar=document.getElementById('bulk-bar');if(sel.size){bar.className='bulk-bar show';document.getElementById('bulk-count').textContent=sel.size+' selected'}else bar.className='bulk-bar'}
+function clearSel(){sel.clear();document.getElementById('sel-all').checked=false;renderLots();updateBulk()}
+function bulkApply(){
+  var ns=gv('bulk-st');
+  if(!ns){toast('Select a status');return}
+  var newPendingIds=[], changedLots=[];
+  sel.forEach(function(id){
+    var l=L.find(function(x){return x.id===id});
+    if(!l)return;
+    log('Bulk: Lot <strong>'+(l.lotNumber||'TBD')+'</strong> ('+cn(l.community)+') → <strong>'+ns+'</strong>');
+    if(ns==='Pending'&&l.status!=='Pending')newPendingIds.push(id);
+    l.status=ns;
+    changedLots.push(l);
+  });
+  changedLots.forEach(spSaveLot);
+  clearSel();renderLots();
+  toast('Updated to "'+ns+'"');
+  if(ns==='Pending'&&newPendingIds.length){
+    setTimeout(function(){showClosingPrompt(newPendingIds)},200);
+  }
+  if(ns==='Sold')checkAutoArchive();
+}
+// TAKEDOWN
+function tdStatus(td,win){
+  var today=new Date();today.setHours(0,0,0,0);
+  var due=new Date(td.date);due.setHours(0,0,0,0);
+  var daysAway=Math.round((due-today)/86400000);
+  var taken=L.filter(function(l){
+    return l.community===td.community&&
+      (!td.tier||(l.tier||'').toLowerCase()===td.tier.toLowerCase())&&
+      (l.status==='Pending'||l.status==='Sold');
+  }).length;
+  var remaining=Math.max(0,td.count-taken);
+  var ahead=taken>=td.count;
+  var level=daysAway<0?'past':ahead?'ahead':daysAway<=14?'urgent':daysAway<=win?'warn':'ok';
+  return{daysAway:daysAway,taken:taken,remaining:remaining,ahead:ahead,level:level};
+}
+
+function renderTakedown(){
+  var cf=gv('td-comm-filter');
+  var win=parseInt(gv('alert-win')||'30');
+  var data=TD.filter(function(td){return !cf||td.community===cf}).sort(function(a,b){return a.date.localeCompare(b.date)});
+  var urgent=data.filter(function(td){return tdStatus(td,win).level==='urgent'});
+  var warn=  data.filter(function(td){return tdStatus(td,win).level==='warn'});
+  var banners='';
+  if(urgent.length)banners+='<div class="abanner abanner-red">⚠ <strong>'+urgent.length+' URGENT</strong> — takedown'+(urgent.length>1?'s':'')+' due within 14 days with lots still needed</div>';
+  if(warn.length)  banners+='<div class="abanner abanner-yel">◉ <strong>'+warn.length+' upcoming</strong> within '+win+' days</div>';
+  document.getElementById('td-banners').innerHTML=banners;
+  var tb=document.getElementById('td-tbody');
+  if(!data.length){tb.innerHTML='<tr><td colspan="9"><div class="empty"><div class="empty-icon">📅</div>No schedule entries</div></td></tr>';return}
+  tb.innerHTML=data.map(function(td){
+    var s=tdStatus(td,win);
+    var stHTML={
+      past:  '<span class="td-past">Passed</span>',
+      ahead: '<span class="td-ahead">✓ Ahead</span>',
+      urgent:'<span class="td-urgent">⚠ '+(s.daysAway===0?'TODAY':s.daysAway+'d — URGENT')+'</span>',
+      warn:  '<span class="td-warn">◉ '+s.daysAway+'d — Due soon</span>',
+      ok:    '<span class="td-ok">'+s.daysAway+'d away</span>'
+    }[s.level];
+    var rowBg=s.level==='urgent'?'background:var(--danger-bg)':s.level==='warn'?'background:var(--warn-bg)':'';
+    return'<tr style="'+rowBg+'">'+
+      '<td><strong>'+cn(td.community)+'</strong></td>'+
+      '<td class="mono">'+fmtD(td.date)+'</td>'+
+      '<td>'+(td.tier||'<span style="color:var(--muted)">Any</span>')+'</td>'+
+      '<td class="r mono">'+td.count+'</td>'+
+      '<td class="r mono" style="color:'+(s.taken>=td.count?'var(--avail)':'var(--ink)')+'">'+s.taken+'</td>'+
+      '<td class="r mono" style="color:'+(s.remaining>0?'var(--danger)':'var(--avail)')+'">'+s.remaining+'</td>'+
+      '<td>'+stHTML+'</td>'+
+      '<td style="color:var(--muted);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis">'+(td.notes||'—')+'</td>'+
+      '<td><button class="btn btn-xs btn-secondary" onclick="openTDModal(\''+td.id+'\')">Edit</button></td>'+
+    '</tr>';
+  }).join('');
+}
+
+// LOG
+function renderLog(){
+  var el=document.getElementById('log-body');
+  if(!LOG.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div>No activity yet</div>';return}
+  el.innerHTML=LOG.map(function(e){
+    var d=new Date(e.ts);
+    var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    return'<div class="log-item"><div class="log-time">'+ds+'</div><div class="log-msg">'+e.msg+'</div></div>';
+  }).join('');
+}
+
+// ── LOT MODAL ─────────────────────────────────────────────────────────────────
+function openLotModal(id){
+  editLotId=id||null;
+  var lot=id?L.find(function(l){return l.id===id}):null;
+  document.getElementById('lm-title').textContent=lot?'Edit Lot '+(lot.lotNumber||'TBD')+' — '+cn(lot.community):'Add Lot';
+  document.getElementById('lm-del').style.display=lot?'inline-flex':'none';
+  refreshDropdowns();
+  sv('lm-comm',  lot?lot.community:'');
+  sv('lm-status',lot?lot.status:'Available');
+  sv('lm-lot',   lot?lot.lotNumber:'');
+  sv('lm-block', lot?lot.block:'');
+  sv('lm-buyer', lot?lot.buyer:'');
+  sv('lm-market',lot?lot.market:'');
+  sv('lm-price', lot?lot.listPrice:'');
+  sv('lm-deposit',lot?lot.depositCredit:'');
+  sv('lm-cdate', lot?lot.contractDate:'');
+  sv('lm-closing',lot?lot.closingDate:'');
+  sv('lm-notes', lot?lot.notes:'');
+  loadTiers();
+  if(lot&&lot.tier)sv('lm-tier',lot.tier);
+  document.getElementById('lot-modal').classList.add('open');
+}
+function closeLotModal(){document.getElementById('lot-modal').classList.remove('open')}
+
+function loadTiers(){
+  var cid=gv('lm-comm');
+  var comm=C.find(function(c){return c.id===cid});
+  var sel=document.getElementById('lm-tier');
+  sel.innerHTML='<option value="">No tier — custom pricing</option>';
+  (comm&&comm.tiers?comm.tiers:[]).forEach(function(t){
+    var o=document.createElement('option');
+    o.value=t.name;
+    o.textContent=t.name+' · List '+fmt(t.listPrice)+' · Dep '+fmt(t.depositCredit);
+    sel.appendChild(o);
+  });
+  document.getElementById('tier-preview-wrap').style.display='none';
+}
+
+function applyTier(){
+  var cid=gv('lm-comm');
+  var comm=C.find(function(c){return c.id===cid});
+  var tn=gv('lm-tier');
+  var wrap=document.getElementById('tier-preview-wrap');
+  if(!tn||!comm){wrap.style.display='none';return}
+  var t=(comm.tiers||[]).find(function(x){return x.name===tn});
+  if(!t){wrap.style.display='none';return}
+  sv('lm-price',t.listPrice);sv('lm-deposit',t.depositCredit);
+  document.getElementById('tier-preview').innerHTML='<strong>'+t.name+'</strong> · List: '+fmt(t.listPrice)+' · Deposit: '+fmt(t.depositCredit);
+  wrap.style.display='flex';
+}
+
+function saveLot(){
+  var cid=gv('lm-comm');
+  if(!cid){toast('Community is required');return}
+  var lot={
+    id:editLotId||uid(),community:cid,
+    lotNumber:gv('lm-lot'),block:gv('lm-block'),
+    status:gv('lm-status'),
+    listPrice:gv('lm-price'),depositCredit:gv('lm-deposit'),
+    buyer:gv('lm-buyer'),market:gv('lm-market'),tier:gv('lm-tier'),
+    contractDate:gv('lm-cdate'),closingDate:gv('lm-closing'),notes:gv('lm-notes')
+  };
+  if(editLotId){
+    var old=L.find(function(l){return l.id===editLotId});
+    if(old&&old.status!==lot.status)log('Lot <strong>'+(lot.lotNumber||'TBD')+'</strong> ('+cn(lot.community)+') → <strong>'+lot.status+'</strong>');
+    // preserve qbEntry and docsSent
+    lot.qbEntry=old?old.qbEntry:false;
+    lot.docsSent=old?old.docsSent:false;
+    var i=L.findIndex(function(l){return l.id===editLotId});L[i]=lot;
+    toast('Lot updated');
+  }else{
+    lot.qbEntry=false;
+    lot.docsSent=false;
+    L.push(lot);
+    log('Lot added: <strong>'+(lot.lotNumber||'TBD')+'</strong> in '+cn(lot.community)+' — '+lot.status);
+    toast('Lot added');
+  }
+  spSaveLot(lot);
+  closeLotModal();render();
+  if(lot.status==='Pending'&&(!old||old.status!=='Pending')){
+    setTimeout(function(){showClosingPrompt([lot.id])},200);
+  }
+  if(lot.status==='Sold')checkAutoArchive();
+}
+
+// ── CLOSING DATE PROMPT ───────────────────────────────────────────────────────
+var pendingLotIds=[];  // lots waiting for a closing date
+
+function showClosingPrompt(lotIds){
+  pendingLotIds=lotIds;
+  var count=lotIds.length;
+  document.getElementById('closing-prompt-desc').innerHTML=
+    '<strong style="color:var(--accent)">'+count+' lot'+(count>1?'s':'')+
+    '</strong> '+(count>1?'have':'has')+' been marked <strong>Pending</strong>.<br>'+
+    'Enter an expected closing date to apply to '+(count>1?'all of them':'it')+'.';
+  document.getElementById('closing-prompt-date').value='';
+  document.getElementById('closing-prompt').classList.add('open');
+}
+
+function applyClosingDate(){
+  var date=gv('closing-prompt-date');
+  if(!date){skipClosingPrompt();return;}
+  var savedLots=[];
+  pendingLotIds.forEach(function(id){
+    var l=L.find(function(x){return x.id===id});
+    if(l){l.closingDate=date;savedLots.push(l);}
+  });
+  savedLots.forEach(spSaveLot);
+  log('Closing date <strong>'+fmtD(date)+'</strong> applied to <strong>'+pendingLotIds.length+' lot'+(pendingLotIds.length>1?'s':'')+'</strong>');
+  pendingLotIds=[];
+  document.getElementById('closing-prompt').classList.remove('open');
+  render();
+  toast('Closing date applied');
+}
+
+function skipClosingPrompt(){
+  pendingLotIds=[];
+  document.getElementById('closing-prompt').classList.remove('open');
+  render();
+}
+
+function toggleQB(id,val){
+  var l=L.find(function(x){return x.id===id});
+  if(!l)return;
+  if(l.status!=='Sold'){toast('QB Entry only available for Sold lots');return;}
+  l.qbEntry=val;
+  spSaveLot(l);
+  log('Lot <strong>'+(l.lotNumber||'TBD')+'</strong> ('+cn(l.community)+') QB Entry → <strong>'+(val?'Yes':'No')+'</strong>');
+  renderLots();
+}
+
+function toggleDS(id,val){
+  var l=L.find(function(x){return x.id===id});
+  if(!l)return;
+  if(l.status!=='Pending'){toast('Docs Sent only available for Pending lots');return;}
+  l.docsSent=val;
+  spSaveLot(l);
+  log('Lot <strong>'+(l.lotNumber||'TBD')+'</strong> ('+cn(l.community)+') Docs Sent → <strong>'+(val?'Yes':'No')+'</strong>');
+  renderLots();
+}
+
+function deleteLot(){
+  if(!confirm('Delete this lot?'))return;
+  var l=L.find(function(x){return x.id===editLotId});
+  if(l)log('Lot <strong>'+(l.lotNumber||'TBD')+'</strong> deleted');
+  spDeleteLot(l);
+  L=L.filter(function(l){return l.id!==editLotId});
+  closeLotModal();render();toast('Lot deleted');
+}
+
+// ── COMMUNITY MODAL ───────────────────────────────────────────────────────────
+var editCommId=null;
+
+function openCommModal(id){
+  editCommId=id||null;
+  var c=id?C.find(function(x){return x.id===id}):null;
+  document.getElementById('cm-title').textContent=c?'Edit Community':'Add Community';
+  document.getElementById('cm-save-btn').textContent=c?'Save Changes':'Add Community';
+  document.getElementById('cm-delete').style.display=c?'inline-flex':'none';
+  sv('cm-name',  c?c.name:'');
+  sv('cm-loc',   c?c.location:'');
+  sv('cm-market',c?c.market:'');
+  sv('cm-total', c?c.totalPlanned:'');
+  sv('cm-notes', c?c.notes:'');
+  // Load existing tiers
+  document.getElementById('tier-rows').innerHTML='';
+  if(c&&c.tiers&&c.tiers.length){
+    c.tiers.forEach(function(t){addTierRow(t)});
+  }
+  document.getElementById('comm-modal').classList.add('open');
+}
+function closeCommModal(){document.getElementById('comm-modal').classList.remove('open');editCommId=null;}
+
+function addTierRow(t){
+  var id=uid();
+  var div=document.createElement('div');
+  div.id='tr-'+id;
+  div.style.cssText='display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center';
+  div.innerHTML='<input placeholder="e.g. Standard" value="'+(t&&t.name?t.name:'')+'" style="font-size:11px;padding:5px 7px">'+
+    '<input type="number" placeholder="List $" value="'+(t&&t.listPrice?t.listPrice:'')+'" style="font-size:11px;padding:5px 7px">'+
+    '<input type="number" placeholder="Deposit $" value="'+(t&&t.depositCredit?t.depositCredit:'')+'" style="font-size:11px;padding:5px 7px">'+
+    '<button onclick="document.getElementById(\'tr-'+id+'\').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px">×</button>';
+  document.getElementById('tier-rows').appendChild(div);
+}
+
+function collectTiers(){
+  var tiers=[];
+  document.querySelectorAll('#tier-rows > div').forEach(function(row){
+    var ins=row.querySelectorAll('input');
+    var name=ins[0].value.trim();
+    if(!name)return;
+    tiers.push({name:name,listPrice:Number(ins[1].value)||0,depositCredit:Number(ins[2].value)||0});
+  });
+  return tiers;
+}
+
+function saveComm(){
+  var name=gv('cm-name').trim();
+  if(!name){toast('Community name required');return}
+  if(editCommId){
+    var c=C.find(function(x){return x.id===editCommId});
+    if(!c)return;
+    c.name=name;c.location=gv('cm-loc');c.market=gv('cm-market');
+    c.totalPlanned=gv('cm-total');c.notes=gv('cm-notes');c.tiers=collectTiers();
+    log('Community updated: <strong>'+name+'</strong>');
+    spSaveCommunity(c);
+    closeCommModal();render();toast('Community updated: '+name);
+  }else{
+    var nc={id:uid(),name:name,location:gv('cm-loc'),market:gv('cm-market'),totalPlanned:gv('cm-total'),notes:gv('cm-notes'),tiers:collectTiers()};
+    C.push(nc);
+    log('Community added: <strong>'+name+'</strong>'+(nc.tiers.length?' with '+nc.tiers.length+' tiers':''));
+    spSaveCommunity(nc);
+    closeCommModal();render();toast('Community added: '+name);
+  }
+}
+
+function deleteCommunity(){
+  var c=C.find(function(x){return x.id===editCommId});
+  if(!c)return;
+  var lotCount=L.filter(function(l){return l.community===editCommId}).length;
+  if(!confirm('Delete "'+c.name+'"?'+(lotCount?' This will also delete '+lotCount+' lots.':'')+' This cannot be undone.'))return;
+  C=C.filter(function(x){return x.id!==editCommId});
+  L.filter(function(l){return l.community===editCommId}).forEach(spDeleteLot);
+  L=L.filter(function(l){return l.community!==editCommId});
+  TD.filter(function(t){return t.community===editCommId}).forEach(spDeleteTD);
+  TD=TD.filter(function(t){return t.community!==editCommId});
+  spDeleteCommunity(c);
+  log('Community <strong>'+c.name+'</strong> deleted'+(lotCount?' ('+lotCount+' lots removed)':''));
+  closeCommModal();render();toast('Community deleted');
+}
+
+
+// ── REQUEST MODAL ─────────────────────────────────────────────────────────────
+// ── TAKEDOWN MODAL ────────────────────────────────────────────────────────────
+function openTDModal(id){
+  editTDId=id||null;
+  var td=id?TD.find(function(t){return t.id===id}):null;
+  document.getElementById('td-modal-title').textContent=td?'Edit Schedule Entry':'Add Takedown Entry';
+  document.getElementById('td-del').style.display=td?'inline-flex':'none';
+  refreshDropdowns();
+  sv('td-comm',  td?td.community:'');
+  sv('td-date',  td?td.date:'');
+  sv('td-tier',  td?td.tier:'');
+  sv('td-count', td?td.count:'');
+  sv('td-notes', td?td.notes:'');
+  document.getElementById('td-modal').classList.add('open');
+}
+function closeTDModal(){document.getElementById('td-modal').classList.remove('open')}
+function saveTD(){
+  var cid=gv('td-comm'),date=gv('td-date'),count=parseInt(gv('td-count'));
+  if(!cid||!date||!count){toast('Community, date and count required');return}
+  var td={id:editTDId||uid(),community:cid,date:date,tier:gv('td-tier'),count:count,notes:gv('td-notes')};
+  if(editTDId){var i=TD.findIndex(function(t){return t.id===editTDId});td._spId=TD[i]._spId;TD[i]=td;toast('Entry updated')}
+  else{TD.push(td);log('Takedown entry: <strong>'+cn(cid)+'</strong> — '+count+' lots due '+fmtD(date));toast('Entry added')}
+  spSaveTD(td);
+  closeTDModal();render();
+}
+function deleteTD(){
+  if(!confirm('Delete this entry?'))return;
+  var td=TD.find(function(t){return t.id===editTDId});
+  if(td)spDeleteTD(td);
+  TD=TD.filter(function(t){return t.id!==editTDId});
+  closeTDModal();render();toast('Entry deleted');
+}
+function openTDImport(){
+  tdImportRows=[];
+  document.getElementById('td-preview').style.display='none';
+  document.getElementById('td-confirm-btn').style.display='none';
+  document.getElementById('td-import-msg').textContent='';
+  document.getElementById('td-xlsx') && (document.getElementById('td-xlsx').value='');
+  document.getElementById('td-csv').value='';
+  // Populate community dropdown
+  var sel=document.getElementById('td-import-comm');
+  sel.innerHTML='<option value="">Select community…</option>'+
+    C.filter(function(c){return !c.archived}).map(function(c){return'<option value="'+c.id+'">'+c.name+'</option>'}).join('');
+  setTDTab('excel');
+  document.getElementById('td-import-modal').classList.add('open');
+}
+function closeTDImport(){document.getElementById('td-import-modal').classList.remove('open')}
+
+function setTDTab(tab){
+  var isExcel=tab==='excel';
+  document.getElementById('td-panel-excel').style.display=isExcel?'':'none';
+  document.getElementById('td-panel-csv').style.display=isExcel?'none':'';
+  document.getElementById('td-tab-excel').style.background=isExcel?'var(--accent)':'var(--surface2)';
+  document.getElementById('td-tab-excel').style.color=isExcel?'#e8e4d8':'var(--muted)';
+  document.getElementById('td-tab-csv').style.background=isExcel?'var(--surface2)':'var(--accent)';
+  document.getElementById('td-tab-csv').style.color=isExcel?'var(--muted)':'#e8e4d8';
+  // reset preview
+  tdImportRows=[];
+  document.getElementById('td-preview').style.display='none';
+  document.getElementById('td-confirm-btn').style.display='none';
+  document.getElementById('td-import-msg').textContent='';
+}
+
+function downloadTDTemplate(){
+  var csv='community,date,tier,count,notes\n'+
+    'Meadow Creek,2026-06-01,Standard,8,Phase 1 kickoff\n'+
+    'Meadow Creek,2026-09-01,Premium,4,\n'+
+    'Sunstone Ranch,2026-07-15,,12,All lot types\n';
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='takedown-schedule-template.csv';
+  a.click();
+  toast('Template downloaded');
+}
+
+var tdImportRows=[];
+
+// ── EXCEL FORMAT HANDLER (your native format) ─────────────────────────────────
+function handleTDExcel(ev){
+  var file=ev.target.files[0];if(!file)return;
+  var commId=document.getElementById('td-import-comm').value;
+  if(!commId){
+    document.getElementById('td-import-msg').textContent='Please select a community first.';
+    document.getElementById('td-import-msg').style.color='var(--danger)';
+    return;
+  }
+  // Use SheetJS (XLSX) to parse
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=new Uint8Array(e.target.result);
+      var wb=XLSX.read(data,{type:'array',cellDates:true});
+
+      // Find Lot Sales sheet (flexible name matching)
+      var sheetName=wb.SheetNames.find(function(n){
+        return n.toLowerCase().replace(/\s/g,'').includes('lotsales')||
+               n.toLowerCase().includes('lot')||
+               n.toLowerCase().includes('sales')||
+               n.toLowerCase().includes('takedown');
+      })||wb.SheetNames[0];
+
+      var ws=wb.Sheets[sheetName];
+      var raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+
+      // Row 0 = headers, Row 1 = prices, Rows 2+ = data
+      var headers=raw[0];
+      var prices=raw[1];
+
+      // Detect tier columns — any column whose header contains "Lot Price" or similar
+      // Skip: Option Period (col 0), Date (col 1), Cumulative, Total
+      var tierCols=[];
+      for(var ci=2;ci<headers.length;ci++){
+        var h=String(headers[ci]||'').toLowerCase();
+        if(h.includes('cumulative')||h.includes('total')||h==='')continue;
+        // Extract tier name — take the part after the last dash or after "Price -"
+        var tierName=String(headers[ci]);
+        var dashIdx=tierName.lastIndexOf(' - ');
+        if(dashIdx>-1) tierName=tierName.slice(dashIdx+3).replace(/Lot Price/i,'').trim();
+        tierName=tierName.trim()||('Type '+(tierCols.length+1));
+        var price=Number(prices[ci])||0;
+        tierCols.push({col:ci,name:tierName,price:price});
+      }
+
+      if(!tierCols.length){
+        document.getElementById('td-import-msg').textContent='Could not detect any lot type columns in "'+sheetName+'".';
+        return;
+      }
+
+      tdImportRows=[];
+      for(var ri=2;ri<raw.length;ri++){
+        var row=raw[ri];
+        var period=String(row[0]||'').trim();
+        if(!period||period.toLowerCase()==='totals'||period==='')continue;
+
+        // Parse date
+        var rawDate=row[1];
+        var dateStr='';
+        if(rawDate instanceof Date){
+          dateStr=rawDate.toISOString().slice(0,10);
+        }else if(typeof rawDate==='string'&&rawDate.trim()){
+          // Try to parse M/D/YYYY or YYYY-MM-DD
+          var dp=rawDate.trim().split(/[\/\-]/);
+          if(dp.length===3){
+            if(dp[0].length===4) dateStr=dp[0]+'-'+dp[1].padStart(2,'0')+'-'+dp[2].padStart(2,'0');
+            else dateStr=dp[2]+'-'+dp[0].padStart(2,'0')+'-'+dp[1].padStart(2,'0');
+          }
+        }else if(typeof rawDate==='number'){
+          // Excel serial date
+          var d=new Date(Math.round((rawDate-25569)*86400*1000));
+          dateStr=d.toISOString().slice(0,10);
+        }
+
+        tierCols.forEach(function(tc){
+          var count=parseInt(row[tc.col])||0;
+          if(!count)return; // skip periods with 0 lots for this tier
+          tdImportRows.push({
+            communityName:cn(commId),
+            communityId:commId,
+            date:dateStr,
+            tier:tc.name,
+            price:tc.price,
+            count:count,
+            notes:'Option Period '+period
+          });
+        });
+      }
+
+      showTDPreview(sheetName);
+    }catch(err){
+      document.getElementById('td-import-msg').textContent='Error reading file: '+err.message;
+      document.getElementById('td-import-msg').style.color='var(--danger)';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── CSV FORMAT HANDLER ────────────────────────────────────────────────────────
+function handleTDImport(ev){
+  var file=ev.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    var delim=text.split('\n')[0].includes('\t')?'\t':',';
+    var lines=text.split('\n').map(function(l){return l.trim()}).filter(function(l){return l.length>0});
+    if(lines.length<2){document.getElementById('td-import-msg').textContent='No data rows found.';return}
+    var rawH=splitCSVLine(lines[0],delim);
+    var headers=rawH.map(function(h){return h.toLowerCase().replace(/[\s_-]/g,'')});
+    function col(names){for(var i=0;i<names.length;i++){var idx=headers.indexOf(names[i].toLowerCase().replace(/[\s_-]/g,''));if(idx>-1)return idx}return -1}
+    var colMap={
+      community:col(['community','communityname','project','subdivision']),
+      date:     col(['date','takedowndate','scheduleddate','duedate']),
+      tier:     col(['tier','lottype','type','pricetier']),
+      count:    col(['count','lots','numlots','quantity','qty','lotsdue']),
+      notes:    col(['notes','note','comments'])
+    };
+    tdImportRows=[];
+    var skipped=0;
+    for(var i=1;i<lines.length;i++){
+      var vals=splitCSVLine(lines[i],delim);
+      function get(key){var idx=colMap[key];return idx>-1&&vals[idx]?vals[idx].trim():''}
+      var commName=get('community'),date=get('date'),count=parseInt(get('count'))||0;
+      if(!commName||!date||!count){skipped++;continue}
+      if(date.includes('/')){var dp=date.split('/');if(dp.length===3)date=dp[2]+'-'+dp[0].padStart(2,'0')+'-'+dp[1].padStart(2,'0')}
+      tdImportRows.push({communityName:commName,communityId:null,date:date,tier:get('tier'),price:0,count:count,notes:get('notes')});
+    }
+    showTDPreview('CSV');
+  };
+  reader.readAsText(file);
+}
+
+function showTDPreview(source){
+  if(!tdImportRows.length){
+    document.getElementById('td-import-msg').textContent='No valid entries found in file.';
+    return;
+  }
+  var preview=tdImportRows.slice(0,10);
+  document.getElementById('td-preview-label').textContent=
+    'Preview from "'+source+'": '+tdImportRows.length+' takedown entries across '+
+    [...new Set(tdImportRows.map(function(r){return r.tier}))].length+' lot types. Showing first '+Math.min(10,tdImportRows.length)+':';
+  document.getElementById('td-preview-head').innerHTML=
+    '<tr>'+['Community','Date','Tier / Type','# Lots','Price','Notes'].map(function(h){
+      return'<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">'+h+'</th>';
+    }).join('')+'</tr>';
+  document.getElementById('td-preview-body').innerHTML=preview.map(function(r){
+    return'<tr style="border-bottom:1px solid var(--border)">'+
+      '<td style="padding:5px 8px">'+r.communityName+'</td>'+
+      '<td style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace">'+r.date+'</td>'+
+      '<td style="padding:5px 8px;color:var(--accent);font-family:\'IBM Plex Mono\',monospace">'+( r.tier||'Any')+'</td>'+
+      '<td style="padding:5px 8px;text-align:right;font-family:\'IBM Plex Mono\',monospace">'+r.count+'</td>'+
+      '<td style="padding:5px 8px;text-align:right;font-family:\'IBM Plex Mono\',monospace">'+(r.price?fmt(r.price):'—')+'</td>'+
+      '<td style="padding:5px 8px;color:var(--muted)">'+(r.notes||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+  document.getElementById('td-preview').style.display='block';
+  document.getElementById('td-confirm-btn').style.display='inline-flex';
+  document.getElementById('td-import-msg').textContent='';
+  document.getElementById('td-import-msg').style.color='var(--muted)';
+}
+
+function confirmTDImport(){
+  if(!tdImportRows.length){toast('Nothing to import');return}
+  var deletedTDs=[];
+  if(document.getElementById('td-clear-first').checked){deletedTDs=TD.slice();TD=[];log('Takedown schedule cleared before import');}
+  var added=0,newComms=[],newTDs=[];
+  tdImportRows.forEach(function(r){
+    var comm;
+    if(r.communityId){
+      comm=C.find(function(c){return c.id===r.communityId});
+    }else{
+      comm=C.find(function(c){return c.name.toLowerCase()===r.communityName.toLowerCase()});
+      if(!comm){comm={id:uid(),name:r.communityName,location:'',market:'',totalPlanned:'',notes:'',tiers:[]};C.push(comm);newComms.push(comm);}
+    }
+    if(!comm)return;
+    var td={id:uid(),community:comm.id,date:r.date,tier:r.tier,count:r.count,notes:r.notes};
+    TD.push(td);
+    newTDs.push(td);
+    added++;
+  });
+  newComms.forEach(spSaveCommunity);
+  newTDs.forEach(spSaveTD);
+  deletedTDs.forEach(spDeleteTD);
+  log('Takedown import: <strong>'+added+' entries</strong>'+(newComms.length?' · '+newComms.length+' new communities':''));
+  closeTDImport();
+  nav('takedown',document.querySelector('[data-pg=takedown]'));
+  toast('Imported '+added+' takedown entries'+(newComms.length?' · '+newComms.length+' new communities':''));
+}
+
+
+// ── BULK LOT ENTRY ────────────────────────────────────────────────────────────
+function openBulkAdd(){
+  refreshDropdowns();
+  var sel=document.getElementById('ba-comm');
+  sel.innerHTML=C.filter(function(c){return !c.archived}).map(function(c){return'<option value="'+c.id+'">'+c.name+'</option>'}).join('');
+  ['ba-block','ba-start','ba-end','ba-buyer','ba-market','ba-closing','ba-price','ba-deposit'].forEach(function(id){sv(id,'')});
+  sv('ba-status','Available');
+  loadBATiers();
+  document.getElementById('ba-preview-wrap').style.display='none';
+  document.getElementById('bulk-add-modal').classList.add('open');
+}
+function closeBulkAdd(){document.getElementById('bulk-add-modal').classList.remove('open')}
+
+function loadBATiers(){
+  var cid=gv('ba-comm');
+  var comm=C.find(function(c){return c.id===cid});
+  var sel=document.getElementById('ba-tier');
+  sel.innerHTML='<option value="">No tier — custom</option>';
+  (comm&&comm.tiers?comm.tiers:[]).forEach(function(t){
+    var o=document.createElement('option');
+    o.value=t.name;
+    o.textContent=t.name+' · List '+fmt(t.listPrice)+' · Dep '+fmt(t.depositCredit);
+    sel.appendChild(o);
+  });
+  sv('ba-price','');sv('ba-deposit','');
+}
+
+function applyBATier(){
+  var cid=gv('ba-comm');
+  var comm=C.find(function(c){return c.id===cid});
+  var tn=gv('ba-tier');
+  if(!tn||!comm)return;
+  var t=(comm.tiers||[]).find(function(x){return x.name===tn});
+  if(t){sv('ba-price',t.listPrice);sv('ba-deposit',t.depositCredit);}
+}
+
+function previewBulkAdd(){
+  var start=parseInt(gv('ba-start')),end=parseInt(gv('ba-end'));
+  var cid=gv('ba-comm');
+  if(!cid||isNaN(start)||isNaN(end)||start>end){toast('Fill in community, start and end lot numbers');return;}
+  var count=end-start+1;
+  var comm=C.find(function(c){return c.id===cid});
+  var wrap=document.getElementById('ba-preview-wrap');
+  document.getElementById('ba-preview').innerHTML=
+    '<strong>'+count+' lots</strong> will be added to <strong>'+(comm?comm.name:'')+'</strong><br>'+
+    'Lot numbers: '+start+' – '+end+'<br>'+
+    (gv('ba-block')?'Block/Phase: '+gv('ba-block')+'<br>':'')+
+    'Status: '+gv('ba-status')+'<br>'+
+    (gv('ba-tier')?'Tier: '+gv('ba-tier')+'<br>':'')+
+    (gv('ba-price')?'List Price: '+fmt(gv('ba-price'))+'<br>':'')+
+    (gv('ba-buyer')?'Builder: '+gv('ba-buyer'):'');
+  wrap.style.display='block';
+}
+
+function confirmBulkAdd(){
+  var cid=gv('ba-comm');
+  var start=parseInt(gv('ba-start')),end=parseInt(gv('ba-end'));
+  if(!cid||isNaN(start)||isNaN(end)||start>end){toast('Fill in community, start and end lot numbers');return;}
+  var added=0, newLots=[];
+  for(var i=start;i<=end;i++){
+    var lot={
+      id:uid(),community:cid,lotNumber:String(i),block:gv('ba-block'),
+      status:gv('ba-status'),listPrice:gv('ba-price'),depositCredit:gv('ba-deposit'),
+      buyer:gv('ba-buyer'),market:gv('ba-market'),tier:gv('ba-tier'),
+      contractDate:'',closingDate:gv('ba-closing'),notes:'',qbEntry:false,docsSent:false
+    };
+    L.push(lot);
+    newLots.push(lot);
+    added++;
+  }
+  newLots.forEach(spSaveLot);
+  log('Bulk add: <strong>'+added+' lots</strong> ('+start+'–'+end+') added to '+cn(cid));
+  closeBulkAdd();render();toast(added+' lots added to '+cn(cid));
+  if(gv('ba-status')==='Pending')checkAutoArchive();
+}
+
+// ── CLOSING CALENDAR ──────────────────────────────────────────────────────────
+function renderCalendar(){
+  var today=new Date();
+  var viewYear=calYear||(today.getFullYear());
+  var viewMonth=calMonth!==undefined?calMonth:today.getMonth();
+
+  // Update nav
+  var monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent=monthNames[viewMonth]+' '+viewYear;
+
+  // Get closings this month — Pending and Sold lots with closing dates
+  var monthStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0');
+  var closings=L.filter(function(l){
+    return (l.status==='Pending'||l.status==='Sold')&&(l.closingDate||'').startsWith(monthStr);
+  });
+
+  // Build calendar grid
+  var firstDay=new Date(viewYear,viewMonth,1).getDay();
+  var daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  var todayStr=today.toISOString().slice(0,10);
+
+  var cells='';
+  // Day headers
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d){
+    cells+='<div style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 0;">'+d+'</div>';
+  });
+  // Empty cells before first day
+  for(var i=0;i<firstDay;i++)cells+='<div></div>';
+  // Day cells
+  for(var d=1;d<=daysInMonth;d++){
+    var dateStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var dayLots=closings.filter(function(l){return l.closingDate===dateStr});
+    var isToday=dateStr===todayStr;
+    var hasPast=new Date(dateStr)<today&&dateStr!==todayStr;
+    cells+='<div style="min-height:70px;border:1px solid var(--border);border-radius:5px;padding:5px;'+
+      (isToday?'background:var(--sold-bg);border-color:var(--sold);':hasPast?'background:var(--surface2);opacity:.7;':'')+
+      '">'+
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:500;'+(isToday?'color:var(--sold)':'color:var(--muted)')+';margin-bottom:3px">'+d+'</div>'+
+      dayLots.slice(0,3).map(function(l){
+        return'<div style="font-size:9px;font-family:\'IBM Plex Mono\',monospace;background:'+(l.status==='Pending'?'var(--pend-bg)':'var(--sold-bg)')+
+          ';color:'+(l.status==='Pending'?'var(--pend)':'var(--sold)')+
+          ';padding:1px 4px;border-radius:2px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+cn(l.community)+' Lot '+(l.lotNumber||'TBD')+(l.buyer?' · '+l.buyer:'')+'">'+
+          cn(l.community).slice(0,8)+' #'+(l.lotNumber||'?')+
+        '</div>';
+      }).join('')+
+      (dayLots.length>3?'<div style="font-size:9px;color:var(--muted);font-family:\'IBM Plex Mono\',monospace">+' +(dayLots.length-3)+' more</div>':'')+
+    '</div>';
+  }
+
+  document.getElementById('cal-grid').innerHTML=cells;
+
+  // Summary list below
+  var byDate={};
+  closings.forEach(function(l){
+    if(!byDate[l.closingDate])byDate[l.closingDate]=[];
+    byDate[l.closingDate].push(l);
+  });
+  var dates=Object.keys(byDate).sort();
+  document.getElementById('cal-list').innerHTML=dates.length
+    ?'<div style="margin-top:18px"><div style="font-family:\'Libre Baskerville\',serif;font-size:15px;color:var(--accent);margin-bottom:12px">'+monthNames[viewMonth]+' Closings ('+closings.length+' lots)</div>'+
+      dates.map(function(dt){
+        var lots=byDate[dt];
+        return'<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start">'+
+          '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--muted);min-width:80px;padding-top:2px">'+fmtD(dt)+'</div>'+
+          '<div>'+lots.map(function(l){
+            return'<span style="display:inline-block;font-family:\'IBM Plex Mono\',monospace;font-size:11px;background:'+(l.status==='Pending'?'var(--pend-bg)':'var(--sold-bg)')+
+              ';color:'+(l.status==='Pending'?'var(--pend)':'var(--sold)')+
+              ';padding:2px 8px;border-radius:3px;margin:2px 3px 2px 0">'+
+              cn(l.community)+' Lot '+(l.lotNumber||'TBD')+(l.buyer?' · '+l.buyer:'')+
+            '</span>';
+          }).join('')+'</div>'+
+        '</div>';
+      }).join('')+'</div>'
+    :'<div class="empty"><div class="empty-icon">📅</div>No closings scheduled for '+monthNames[viewMonth]+'</div>';
+}
+
+var calYear, calMonth;
+function calNav(dir){
+  var today=new Date();
+  if(calYear===undefined){calYear=today.getFullYear();calMonth=today.getMonth();}
+  calMonth+=dir;
+  if(calMonth>11){calMonth=0;calYear++;}
+  if(calMonth<0){calMonth=11;calYear--;}
+  renderCalendar();
+}
+
+// ── CLEAR ALL ─────────────────────────────────────────────────────────────────
+function clearAll(){
+  // Show stats of what will be deleted
+  var activeComms=C.filter(function(c){return !c.archived}).length;
+  var archivedComms=C.filter(function(c){return c.archived}).length;
+  document.getElementById('clear-modal-stats').innerHTML=
+    '· '+C.length+' communities ('+activeComms+' active, '+archivedComms+' archived)<br>'+
+    '· '+L.length+' lots<br>'+
+    '· '+TD.length+' takedown schedule entries<br>'+
+    '· '+LOG.length+' activity log entries';
+  document.getElementById('clear-confirm-check').checked=false;
+  document.getElementById('clear-modal').classList.add('open');
+}
+function closeClearModal(){
+  document.getElementById('clear-modal').classList.remove('open');
+}
+function confirmClearAll(){
+  if(!document.getElementById('clear-confirm-check').checked){
+    document.getElementById('clear-confirm-check').style.outline='2px solid var(--danger)';
+    setTimeout(function(){document.getElementById('clear-confirm-check').style.outline='';},1500);
+    return;
+  }
+  C=[];L=[];R=[];TD=[];LOG=[];sel=new Set();
+  closeClearModal();
+  log('All data cleared — fresh start');
+  render();toast('All data cleared');
+}
+
+// ── IMPORT ────────────────────────────────────────────────────────────────────
+var importRows=[];
+
+function openImportModal(){
+  importRows=[];
+  document.getElementById('import-preview').style.display='none';
+  document.getElementById('import-confirm-btn').style.display='none';
+  document.getElementById('import-msg').textContent='';
+  document.getElementById('import-file').value='';
+  document.getElementById('import-modal').classList.add('open');
+}
+function closeImportModal(){document.getElementById('import-modal').classList.remove('open')}
+
+function downloadTemplate(){
+  var csv='community,lotNumber,block,status,listPrice,depositCredit,buyer,market,tier,closingDate,notes\n'+
+    'Meadow Creek,1,Phase 1,Available,72000,6000,,,Standard,,\n'+
+    'Meadow Creek,2,Phase 1,Pending,85000,7500,DR Horton,Phoenix,Premium,2026-08-15,\n'+
+    'Meadow Creek,,Phase 2,Available,72000,6000,,,Standard,,Unplatted lot\n'+
+    'Sunstone Ranch,1,Block A,Sold,92000,8000,Meritage Homes,Phoenix,Corner,2026-06-01,\n';
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='lotledger-import-template.csv';
+  a.click();
+  toast('Template downloaded');
+}
+
+function handleImport(ev){
+  var file=ev.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    // Detect delimiter
+    var firstLine=text.split('\n')[0];
+    var delim=firstLine.includes('\t')?'\t':',';
+    var lines=text.split('\n').map(function(l){return l.trim()}).filter(function(l){return l.length>0});
+    if(lines.length<2){document.getElementById('import-msg').textContent='No data rows found.';return}
+
+    // Parse headers — flexible matching
+    var rawHeaders=splitCSVLine(lines[0],delim);
+    var headers=rawHeaders.map(function(h){return h.toLowerCase().replace(/[\s_-]/g,'')});
+
+    function col(names){
+      for(var i=0;i<names.length;i++){
+        var idx=headers.indexOf(names[i].toLowerCase().replace(/[\s_-]/g,''));
+        if(idx>-1)return idx;
+      }
+      return -1;
+    }
+
+    var colMap={
+      community:    col(['community','communityname','project','subdivision']),
+      lotNumber:    col(['lotnumber','lot','lot#','lotno','lotn']),
+      block:        col(['block','phase','blockphase','section']),
+      status:       col(['status','lotstatus']),
+      listPrice:    col(['listprice','price','saleprice','list']),
+      depositCredit:col(['depositcredit','deposit','depositamt','credit']),
+      buyer:        col(['buyer','builder','buildername','buyername']),
+      market:       col(['market','area','region','metro']),
+      tier:         col(['tier','pricetier','lottype','type']),
+      closingDate:  col(['closingdate','closing','closedate','expectedclosing']),
+      notes:        col(['notes','note','comments','comment'])
+    };
+
+    importRows=[];
+    var skipped=0;
+    for(var i=1;i<lines.length;i++){
+      var vals=splitCSVLine(lines[i],delim);
+      function get(key){var idx=colMap[key];return idx>-1&&vals[idx]?vals[idx].trim():'';}
+      var commName=get('community');
+      if(!commName){skipped++;continue}
+      var status=get('status');
+      var validSt=['Available','Pending','Sold'];
+      // Normalize status
+      if(status){
+        var sl=status.toLowerCase();
+        if(sl.includes('avail'))status='Available';
+        else if(sl.includes('pend')||sl.includes('contract')||sl.includes('reserv'))status='Pending';
+        else if(sl.includes('sold')||sl.includes('clos'))status='Sold';
+        else status='Available';
+      }else{status='Available'}
+      importRows.push({
+        communityName:commName,
+        lotNumber:get('lotNumber'),block:get('block'),status:status,
+        listPrice:get('listPrice'),depositCredit:get('depositCredit'),
+        buyer:get('buyer'),market:get('market'),tier:get('tier'),
+        closingDate:get('closingDate'),notes:get('notes')
+      });
+    }
+
+    // Show preview
+    var preview=importRows.slice(0,8);
+    document.getElementById('import-preview-label').textContent=
+      'Preview: '+importRows.length+' lots found'+(skipped?' ('+skipped+' rows skipped — no community name)':'')+'. Showing first '+Math.min(8,importRows.length)+':';
+    document.getElementById('import-preview-head').innerHTML=
+      '<tr><th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Community</th>'+
+      '<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Lot #</th>'+
+      '<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Block</th>'+
+      '<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Status</th>'+
+      '<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:right">List $</th>'+
+      '<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Buyer</th>'+
+      '<th style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Tier</th></tr>';
+    document.getElementById('import-preview-body').innerHTML=preview.map(function(r){
+      return'<tr style="border-bottom:1px solid var(--border)">'+
+        '<td style="padding:5px 8px">'+r.communityName+'</td>'+
+        '<td style="padding:5px 8px;font-family:\'IBM Plex Mono\',monospace">'+(r.lotNumber||'<span style="color:var(--muted)">TBD</span>')+'</td>'+
+        '<td style="padding:5px 8px;color:var(--muted)">'+(r.block||'—')+'</td>'+
+        '<td style="padding:5px 8px"><span class="chip '+chipCls(r.status)+'">'+r.status+'</span></td>'+
+        '<td style="padding:5px 8px;text-align:right;font-family:\'IBM Plex Mono\',monospace">'+(r.listPrice?'$'+Number(r.listPrice).toLocaleString():'—')+'</td>'+
+        '<td style="padding:5px 8px">'+(r.buyer||'—')+'</td>'+
+        '<td style="padding:5px 8px">'+(r.tier||'—')+'</td>'+
+      '</tr>';
+    }).join('');
+    document.getElementById('import-preview').style.display='block';
+    document.getElementById('import-confirm-btn').style.display='inline-flex';
+    document.getElementById('import-msg').textContent='';
+  };
+  reader.readAsText(file);
+}
+
+function splitCSVLine(line,delim){
+  // Handles quoted fields
+  var result=[],cur='',inQ=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line[i];
+    if(ch==='"'){inQ=!inQ}
+    else if(ch===delim&&!inQ){result.push(cur);cur=''}
+    else{cur+=ch}
+  }
+  result.push(cur);
+  return result;
+}
+
+function confirmImport(){
+  if(!importRows.length){toast('Nothing to import');return}
+  var deletedLots=[];
+  if(document.getElementById('import-clear-first').checked){
+    deletedLots=L.slice();
+    L=[];
+    log('Lots cleared before import');
+  }
+  var newComms=[],newLots=[],added=0;
+  importRows.forEach(function(r){
+    var comm=C.find(function(c){return c.name.toLowerCase()===r.communityName.toLowerCase()});
+    if(!comm){
+      comm={id:uid(),name:r.communityName,location:'',market:r.market||'',totalPlanned:'',notes:'',tiers:[]};
+      C.push(comm);
+      newComms.push(comm);
+    }
+    var lot={
+      id:uid(),community:comm.id,
+      lotNumber:r.lotNumber,block:r.block,status:r.status,
+      listPrice:r.listPrice,depositCredit:r.depositCredit,
+      buyer:r.buyer,market:r.market||comm.market,tier:r.tier,
+      contractDate:'',closingDate:r.closingDate,notes:r.notes,qbEntry:false,docsSent:false
+    };
+    L.push(lot);
+    newLots.push(lot);
+    added++;
+  });
+  // Save to SharePoint async (batched)
+  newComms.forEach(spSaveCommunity);
+  newLots.forEach(spSaveLot);
+  deletedLots.forEach(spDeleteLot);
+  log('CSV import: <strong>'+added+' lots</strong> added'+(newComms.length?' · '+newComms.length+' new communities':''));
+  closeImportModal();
+  nav('lots',document.querySelector('[data-pg=lots]'));
+  toast('Imported '+added+' lots'+(newComms.length?' · '+newComms.length+' new communities':''));
+}
+
+// ── ARCHIVE ───────────────────────────────────────────────────────────────────
+var archiveTargetId=null;
+
+function promptArchive(commId){
+  archiveTargetId=commId;
+  var c=C.find(function(x){return x.id===commId});
+  if(!c)return;
+  var cl=L.filter(function(l){return l.community===commId});
+  var listVal=cl.reduce(function(a,l){return a+Number(l.listPrice||0)},0);
+  var depVal=cl.reduce(function(a,l){return a+Number(l.depositCredit||0)},0);
+  document.getElementById('archive-prompt-name').textContent=c.name;
+  document.getElementById('archive-prompt-stats').innerHTML=
+    'Total lots: '+cl.length+' &nbsp;·&nbsp; All Sold<br>'+
+    'Total list value: '+fmt(listVal)+'<br>'+
+    'Total deposit credits: '+fmt(depVal);
+  document.getElementById('archive-prompt').classList.add('open');
+}
+
+function closeArchivePrompt(){
+  archiveTargetId=null;
+  document.getElementById('archive-prompt').classList.remove('open');
+}
+
+function confirmArchive(){
+  var c=C.find(function(x){return x.id===archiveTargetId});
+  if(!c)return;
+  var cl=L.filter(function(l){return l.community===c.id});
+  c.archived=true;
+  c.archivedDate=new Date().toISOString().slice(0,10);
+  c.snapshot={
+    totalLots:cl.length,
+    listVal:cl.reduce(function(a,l){return a+Number(l.listPrice||0)},0),
+    depVal:cl.reduce(function(a,l){return a+Number(l.depositCredit||0)},0),
+    builders:[...new Set(cl.map(function(l){return l.buyer}).filter(Boolean))].join(', ')
+  };
+  spSaveCommunity(c);
+  log('Community <strong>'+c.name+'</strong> archived — '+cl.length+' lots, '+fmt(c.snapshot.listVal)+' total value');
+  closeArchivePrompt();
+  render();
+  toast(c.name+' archived successfully');
+}
+
+function checkAutoArchive(){
+  // Called after any lot status change — prompts if a community just became 100% sold
+  C.filter(function(c){return !c.archived}).forEach(function(c){
+    var cl=L.filter(function(l){return l.community===c.id});
+    if(cl.length>0&&cl.every(function(l){return l.status==='Sold'})){
+      // Small delay so UI settles first
+      setTimeout(function(){promptArchive(c.id)},400);
+    }
+  });
+}
+
+function restoreCommunity(commId){
+  var c=C.find(function(x){return x.id===commId});
+  if(!c)return;
+  if(!confirm('Restore '+c.name+' to active? It will reappear in all active views.'))return;
+  c.archived=false;
+  c.archivedDate=null;
+  log('Community <strong>'+c.name+'</strong> restored to active');
+  render();
+  toast(c.name+' restored to active');
+}
+
+function renderArchive(){
+  var archived=C.filter(function(c){return c.archived});
+  var empty=document.getElementById('archive-empty');
+  var grid=document.getElementById('archive-grid');
+  if(!archived.length){
+    empty.style.display='block';
+    grid.innerHTML='';
+    return;
+  }
+  empty.style.display='none';
+  grid.className='archive-grid';
+  grid.innerHTML=archived.map(function(c){
+    var sn=c.snapshot||{};
+    var cl=L.filter(function(l){return l.community===c.id});
+    var totalLots=sn.totalLots||cl.length;
+    var listVal=sn.listVal||cl.reduce(function(a,l){return a+Number(l.listPrice||0)},0);
+    var depVal=sn.depVal||cl.reduce(function(a,l){return a+Number(l.depositCredit||0)},0);
+    var builders=sn.builders||[...new Set(cl.map(function(l){return l.buyer}).filter(Boolean))].join(', ');
+    return'<div class="archive-card">'+
+      '<div class="archive-card-head">'+
+        '<div>'+
+          '<div class="archive-card-name">'+c.name+'</div>'+
+          '<div class="archive-card-loc">'+(c.location||'')+(c.market?' · '+c.market:'')+'</div>'+
+        '</div>'+
+        '<span class="archive-badge">✓ Sold Out</span>'+
+      '</div>'+
+      '<div class="archive-card-body">'+
+        '<div class="archive-stat-row"><span class="archive-stat-label">Total Lots</span><span class="archive-stat-val">'+totalLots+'</span></div>'+
+        '<div class="archive-stat-row"><span class="archive-stat-label">Total List Value</span><span class="archive-stat-val">'+fmt(listVal)+'</span></div>'+
+        '<div class="archive-stat-row"><span class="archive-stat-label">Total Deposit Credits</span><span class="archive-stat-val">'+fmt(depVal)+'</span></div>'+
+        '<div class="archive-stat-row"><span class="archive-stat-label">Builder(s)</span><span class="archive-stat-val" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;text-align:right">'+(builders||'—')+'</span></div>'+
+        '<div class="archive-stat-row"><span class="archive-stat-label">Archived</span><span class="archive-stat-val">'+(c.archivedDate?fmtD(c.archivedDate):'—')+'</span></div>'+
+      '</div>'+
+      '<div class="archive-card-foot">'+
+        '<button class="btn btn-xs btn-secondary" onclick="viewArchivedLots(\''+c.id+'\')">View Lots</button>'+
+        '<button class="btn btn-xs btn-secondary" onclick="restoreCommunity(\''+c.id+'\')">↩ Restore</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function viewArchivedLots(commId){
+  // Temporarily show archived community in lot inventory
+  var c=C.find(function(x){return x.id===commId});
+  if(!c)return;
+  // Temporarily unarchive for viewing
+  c._tempView=true;
+  c.archived=false;
+  nav('lots',document.querySelector('[data-pg=lots]'));
+  sv('cf-community',commId);
+  renderLots();
+  // Re-archive after nav
+  c.archived=true;
+  c._tempView=false;
+  // Manually add archived community to cf-community dropdown
+  var e=document.getElementById('cf-community');
+  if(e){
+    var opt=document.createElement('option');
+    opt.value=c.id;opt.textContent=c.name+' (Archived)';
+    e.appendChild(opt);e.value=c.id;
+  }
+  // Re-filter with archived temporarily included
+  var orig=L.filter(function(l){return l.community===commId});
+  var tb=document.getElementById('lot-tbody');
+  if(orig.length){
+    tb.innerHTML=orig.map(function(l){
+      var sp=Number(l.listPrice||0)-Number(l.depositCredit||0);
+      var tierBadge=l.tier?'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;background:var(--surface2);padding:2px 6px;border-radius:3px;color:var(--accent)">'+l.tier+'</span>':'—';
+      return'<tr>'+
+        '<td></td>'+
+        '<td>'+cn(l.community)+'</td>'+
+        '<td>'+(l.buyer||'—')+'</td>'+
+        '<td>'+(l.market||'—')+'</td>'+
+        '<td class="mono"><strong>'+(l.lotNumber||'TBD')+'</strong></td>'+
+        '<td>'+(l.block||'—')+'</td>'+
+        '<td>'+chip(l.status)+'</td>'+
+        '<td class="mono">'+fmtD(l.closingDate)+'</td>'+
+        '<td>'+tierBadge+'</td>'+
+        '<td class="r mono">'+fmt(l.listPrice)+'</td>'+
+        '<td class="r mono">'+fmt(l.depositCredit)+'</td>'+
+        '<td class="r mono">'+fmt(sp)+'</td>'+
+        '<td><span class="restore-badge">Archived</span></td>'+
+        '<td></td>'+
+      '</tr>';
+    }).join('');
+    document.getElementById('lot-title').textContent=c.name+' (Archived)';
+    document.getElementById('lot-sub').textContent=orig.length+' lots · read-only';
+  }
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function openExportModal(){document.getElementById('export-modal').classList.add('open')}
+function closeExportModal(){document.getElementById('export-modal').classList.remove('open')}
+
+// Shared: download an XLSX workbook
+function downloadXLSX(wb, filename){
+  var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  var blob=new Blob([wbout],{type:'application/octet-stream'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename+'-'+new Date().toISOString().slice(0,10)+'.xlsx';
+  a.click();
+}
+
+// Shared: apply header style to a row
+function styleHeader(ws, range, bgColor){
+  for(var C2=range.s.c;C2<=range.e.c;C2++){
+    var addr=XLSX.utils.encode_cell({r:range.s.r,c:C2});
+    if(!ws[addr])continue;
+    ws[addr].s={
+      fill:{fgColor:{rgb:bgColor||'0F2548'}},
+      font:{color:{rgb:'E8E4D8'},bold:true},
+      alignment:{horizontal:'center'}
+    };
+  }
+}
+
+// ── FULL DATA EXPORT ──────────────────────────────────────────────────────────
+function exportFullXLSX(){
+  var wb=XLSX.utils.book_new();
+
+  // ── Sheet 1: Lots ──
+  var lotRows=[['Community','Lot #','Block/Phase','Status','List Price','Deposit Credit','Net','Buyer/Builder','Market','Tier','Contract Date','Closing Date','Docs Sent','QB Entry','Notes']];
+  L.forEach(function(l){
+    lotRows.push([
+      cn(l.community),l.lotNumber||'TBD',l.block||'',l.status,
+      Number(l.listPrice)||0,Number(l.depositCredit)||0,
+      (Number(l.listPrice)||0)-(Number(l.depositCredit)||0),
+      l.buyer||'',l.market||'',l.tier||'',
+      l.contractDate||'',l.closingDate||'',
+      l.docsSent?'Yes':'No',l.qbEntry?'Yes':'No',l.notes||''
+    ]);
+  });
+  var ws1=XLSX.utils.aoa_to_sheet(lotRows);
+  ws1['!cols']=[{wch:22},{wch:8},{wch:14},{wch:12},{wch:12},{wch:14},{wch:12},{wch:20},{wch:14},{wch:12},{wch:13},{wch:13},{wch:10},{wch:10},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Lots');
+
+  // ── Sheet 2: Communities ──
+  var commRows=[['Name','Location','Market','Total Planned','Active Lots','Available','Pending','Sold','Total List Value','Total Deposit','Notes']];
+  C.filter(function(c){return !c.archived}).forEach(function(c){
+    var cl=L.filter(function(l){return l.community===c.id});
+    commRows.push([
+      c.name,c.location||'',c.market||'',Number(c.totalPlanned)||0,
+      cl.length,
+      cl.filter(function(l){return l.status==='Available'}).length,
+      cl.filter(function(l){return l.status==='Pending'}).length,
+      cl.filter(function(l){return l.status==='Sold'}).length,
+      cl.reduce(function(a,l){return a+Number(l.listPrice||0)},0),
+      cl.reduce(function(a,l){return a+Number(l.depositCredit||0)},0),
+      c.notes||''
+    ]);
+  });
+  var ws2=XLSX.utils.aoa_to_sheet(commRows);
+  ws2['!cols']=[{wch:22},{wch:16},{wch:14},{wch:14},{wch:12},{wch:11},{wch:10},{wch:8},{wch:16},{wch:15},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Communities');
+
+  // ── Sheet 3: Takedown Schedule ──
+  var tdRows=[['Community','Scheduled Date','Tier/Type','Lots Due','Taken Down','Remaining','Status','Notes']];
+  TD.sort(function(a,b){return a.date.localeCompare(b.date)}).forEach(function(td){
+    var s=tdStatus(td,30);
+    tdRows.push([
+      cn(td.community),td.date,td.tier||'Any',td.count,
+      s.taken,s.remaining,
+      s.level==='ahead'?'Ahead of schedule':s.level==='urgent'?'URGENT':s.level==='warn'?'Due soon':s.level==='past'?'Passed':'On track',
+      td.notes||''
+    ]);
+  });
+  var ws3=XLSX.utils.aoa_to_sheet(tdRows);
+  ws3['!cols']=[{wch:22},{wch:14},{wch:12},{wch:10},{wch:12},{wch:11},{wch:18},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Takedown Schedule');
+
+  // ── Sheet 4: Archive ──
+  var archRows=[['Community','Location','Market','Total Lots','List Value','Deposit Credits','Builders','Archived Date']];
+  C.filter(function(c){return c.archived}).forEach(function(c){
+    var sn=c.snapshot||{};
+    archRows.push([c.name,c.location||'',c.market||'',sn.totalLots||0,sn.listVal||0,sn.depVal||0,sn.builders||'',c.archivedDate||'']);
+  });
+  var ws4=XLSX.utils.aoa_to_sheet(archRows);
+  ws4['!cols']=[{wch:22},{wch:16},{wch:14},{wch:12},{wch:14},{wch:16},{wch:30},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws4,'Archive');
+
+  downloadXLSX(wb,'lotledger-full-export');
+  closeExportModal();toast('Full export downloaded');
+}
+
+// ── SUMMARY REPORT ────────────────────────────────────────────────────────────
+function exportSummaryReport(){
+  var wb=XLSX.utils.book_new();
+  var today=new Date();
+  var todayStr=today.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var activeLots=L.filter(function(l){var c=C.find(function(x){return x.id===l.community});return c&&!c.archived});
+  var activeComms=C.filter(function(c){return !c.archived});
+
+  function sumS(arr,key){return arr.reduce(function(a,l){return a+Number(l[key]||0)},0)}
+  function byStatus(arr,s){return arr.filter(function(l){return l.status===s})}
+
+  // ── Sheet 1: Portfolio Overview ──
+  var overview=[
+    ['LotLedger Pro — Portfolio Summary Report'],
+    ['Generated: '+todayStr],
+    [''],
+    ['PORTFOLIO OVERVIEW',''],
+    ['Active Communities',activeComms.length],
+    ['Total Active Lots',activeLots.length],
+    [''],
+    ['STATUS BREAKDOWN','Lots','List Value','Deposit Credits','Net Value'],
+    ['Available',
+      byStatus(activeLots,'Available').length,
+      sumS(byStatus(activeLots,'Available'),'listPrice'),
+      sumS(byStatus(activeLots,'Available'),'depositCredit'),
+      sumS(byStatus(activeLots,'Available'),'listPrice')-sumS(byStatus(activeLots,'Available'),'depositCredit')
+    ],
+    ['Pending',
+      byStatus(activeLots,'Pending').length,
+      sumS(byStatus(activeLots,'Pending'),'listPrice'),
+      sumS(byStatus(activeLots,'Pending'),'depositCredit'),
+      sumS(byStatus(activeLots,'Pending'),'listPrice')-sumS(byStatus(activeLots,'Pending'),'depositCredit')
+    ],
+    ['Sold',
+      byStatus(activeLots,'Sold').length,
+      sumS(byStatus(activeLots,'Sold'),'listPrice'),
+      sumS(byStatus(activeLots,'Sold'),'depositCredit'),
+      sumS(byStatus(activeLots,'Sold'),'listPrice')-sumS(byStatus(activeLots,'Sold'),'depositCredit')
+    ],
+    ['TOTAL',
+      activeLots.length,
+      sumS(activeLots,'listPrice'),
+      sumS(activeLots,'depositCredit'),
+      sumS(activeLots,'listPrice')-sumS(activeLots,'depositCredit')
+    ]
+  ];
+  var ws1=XLSX.utils.aoa_to_sheet(overview);
+  ws1['!cols']=[{wch:26},{wch:12},{wch:16},{wch:16},{wch:14}];
+  ws1['A1'].s={font:{bold:true,sz:14,color:{rgb:'0F2548'}}};
+  XLSX.utils.book_append_sheet(wb,ws1,'Overview');
+
+  // ── Sheet 2: Community Breakdown ──
+  var commRows=[['Community','Location','Market','Total Lots','Available','Pending','Sold','% Sold','List Value','Deposit Credits','Net Value']];
+  activeComms.forEach(function(c){
+    var cl=L.filter(function(l){return l.community===c.id});
+    var sold=byStatus(cl,'Sold').length;
+    commRows.push([
+      c.name,c.location||'',c.market||'',cl.length,
+      byStatus(cl,'Available').length,byStatus(cl,'Pending').length,sold,
+      cl.length>0?Math.round(sold/cl.length*100)+'%':'0%',
+      sumS(cl,'listPrice'),sumS(cl,'depositCredit'),
+      sumS(cl,'listPrice')-sumS(cl,'depositCredit')
+    ]);
+  });
+  // Totals row
+  commRows.push([
+    'TOTALS','','',
+    activeComms.reduce(function(a,c){return a+L.filter(function(l){return l.community===c.id}).length},0),
+    byStatus(activeLots,'Available').length,
+    byStatus(activeLots,'Pending').length,
+    byStatus(activeLots,'Sold').length,
+    activeLots.length>0?Math.round(byStatus(activeLots,'Sold').length/activeLots.length*100)+'%':'0%',
+    sumS(activeLots,'listPrice'),sumS(activeLots,'depositCredit'),
+    sumS(activeLots,'listPrice')-sumS(activeLots,'depositCredit')
+  ]);
+  var ws2=XLSX.utils.aoa_to_sheet(commRows);
+  ws2['!cols']=[{wch:22},{wch:16},{wch:14},{wch:12},{wch:11},{wch:10},{wch:8},{wch:8},{wch:14},{wch:15},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Community Breakdown');
+
+  // ── Sheet 3: Pending Lots ──
+  var pendRows=[['Community','Lot #','Block/Phase','Builder/Buyer','Market','Tier','List Price','Deposit','Net','Expected Closing','Docs Sent']];
+  byStatus(activeLots,'Pending').sort(function(a,b){return(a.closingDate||'').localeCompare(b.closingDate||'')}).forEach(function(l){
+    pendRows.push([
+      cn(l.community),l.lotNumber||'TBD',l.block||'',l.buyer||'',l.market||'',l.tier||'',
+      Number(l.listPrice)||0,Number(l.depositCredit)||0,
+      (Number(l.listPrice)||0)-(Number(l.depositCredit)||0),
+      l.closingDate||'',l.docsSent?'Yes':'No'
+    ]);
+  });
+  if(pendRows.length===1)pendRows.push(['No pending lots','','','','','','','','','','']);
+  var ws3=XLSX.utils.aoa_to_sheet(pendRows);
+  ws3['!cols']=[{wch:22},{wch:8},{wch:14},{wch:20},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Pending Lots');
+
+  // ── Sheet 4: Upcoming Takedowns (next 90 days) ──
+  var tdRows=[['Community','Scheduled Date','Tier/Type','Lots Due','Taken Down','Remaining','Alert Status','Notes']];
+  var upcoming=TD.filter(function(td){
+    var s=tdStatus(td,90);
+    return s.level!=='past';
+  }).sort(function(a,b){return a.date.localeCompare(b.date)});
+  upcoming.forEach(function(td){
+    var s=tdStatus(td,90);
+    var statusLabel=s.level==='ahead'?'✓ Ahead of schedule':s.level==='urgent'?'⚠ URGENT':s.level==='warn'?'Due soon':'On track';
+    tdRows.push([cn(td.community),td.date,td.tier||'Any',td.count,s.taken,s.remaining,statusLabel,td.notes||'']);
+  });
+  if(tdRows.length===1)tdRows.push(['No upcoming takedowns','','','','','','','']);
+  var ws4=XLSX.utils.aoa_to_sheet(tdRows);
+  ws4['!cols']=[{wch:22},{wch:14},{wch:12},{wch:10},{wch:12},{wch:11},{wch:22},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws4,'Upcoming Takedowns');
+
+  // ── Sheet 5: Archive Summary ──
+  var archComms=C.filter(function(c){return c.archived});
+  var archRows=[['Community','Location','Market','Total Lots','List Value','Deposit Credits','Builders','Archived Date']];
+  archComms.forEach(function(c){
+    var sn=c.snapshot||{};
+    archRows.push([c.name,c.location||'',c.market||'',sn.totalLots||0,sn.listVal||0,sn.depVal||0,sn.builders||'',c.archivedDate||'']);
+  });
+  if(archRows.length===1)archRows.push(['No archived communities','','','','','','','']);
+  var ws5=XLSX.utils.aoa_to_sheet(archRows);
+  ws5['!cols']=[{wch:22},{wch:16},{wch:14},{wch:12},{wch:14},{wch:16},{wch:30},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws5,'Archive');
+
+  downloadXLSX(wb,'lotledger-summary-report');
+  closeExportModal();toast('Summary report downloaded');
+}
+
+// Legacy CSV export (respects current filters)
+function exportCSV(){
+  var data=filteredLots();
+  var headers='community,lotNumber,block,status,docsSent,listPrice,depositCredit,net,buyer,market,tier,contractDate,closingDate,qbEntry,notes';
+  var rows=data.map(function(l){
+    return[cn(l.community),l.lotNumber,l.block,l.status,
+      l.docsSent?'Yes':'No',l.listPrice,l.depositCredit,
+      (Number(l.listPrice||0)-Number(l.depositCredit||0)),
+      l.buyer,l.market,l.tier,l.contractDate,l.closingDate,
+      l.qbEntry?'Yes':'No',l.notes]
+      .map(function(v){return'"'+(v||'').toString().replace(/"/g,'""')+'"'}).join(',');
+  });
+  var csv=[headers].concat(rows).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='lotledger-lots-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('CSV downloaded ('+data.length+' lots)');
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+var toastT;
+function toast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast show';
+  clearTimeout(toastT);toastT=setTimeout(function(){el.className='toast'},2500);
+}
+
+// ── SHAREPOINT CONFIGURATION ──────────────────────────────────────────────────
+var SP_CONFIG = {
+  tenantId:   'f328b836-b436-478b-adb9-f057cdd68b84',
+  clientId:   '9d23a65f-331e-4336-b1b8-cfbf09feff45',
+  siteId:     'e00cf237-cce1-441d-9f78-00ebf908e97d',
+  siteUrl:    'https://coronadowestaz.sharepoint.com/sites/LotLedger',
+  tenant:     'coronadowestaz'
+};
+
+var msalApp = new msal.PublicClientApplication({
+  auth: {
+    clientId:    SP_CONFIG.clientId,
+    authority:   'https://login.microsoftonline.com/' + SP_CONFIG.tenantId,
+    redirectUri: 'https://coronadowestaz.sharepoint.com'
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+});
+
+var spToken = null;
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function getToken() {
+  var account = msalApp.getAllAccounts()[0];
+  var req = { scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'] };
+  try {
+    if (account) {
+      return (await msalApp.acquireTokenSilent({ ...req, account })).accessToken;
+    }
+    // Use redirect flow — works in all browsers including SharePoint viewer
+    await msalApp.acquireTokenRedirect(req);
+    return null; // page will reload after redirect
+  } catch(e) {
+    if (e.name === 'InteractionRequiredAuthError') {
+      await msalApp.acquireTokenRedirect(req);
+      return null;
+    }
+    throw e;
+  }
+}
+
+// ── GRAPH API HELPERS ─────────────────────────────────────────────────────────
+var GRAPH = 'https://graph.microsoft.com/v1.0';
+
+async function spGet(listName) {
+  var token = await getToken();
+  var url = GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items?expand=fields&$top=5000';
+  var items = [], nextLink = url;
+  while (nextLink) {
+    var r = await fetch(nextLink, { headers: { Authorization: 'Bearer ' + token } });
+    var d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    items = items.concat(d.value);
+    nextLink = d['@odata.nextLink'] || null;
+  }
+  return items.map(function(i) { return Object.assign({ _spId: i.id }, i.fields); });
+}
+
+async function spCreate(listName, fields) {
+  var token = await getToken();
+  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: fields })
+  });
+  var d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.id;
+}
+
+async function spUpdate(listName, spId, fields) {
+  var token = await getToken();
+  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items/' + spId + '/fields', {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields)
+  });
+  var d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+}
+
+async function spDelete(listName, spId) {
+  var token = await getToken();
+  await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items/' + spId, {
+    method: 'DELETE',
+    headers: { Authorization: 'Bearer ' + token }
+  });
+}
+
+// ── DATA LOAD FROM SHAREPOINT ─────────────────────────────────────────────────
+function loadProgress(msg, pct) {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading-bar').style.width = pct + '%';
+}
+
+async function loadFromSharePoint() {
+  try {
+    // Handle redirect response first (MSAL redirect flow)
+    await msalApp.handleRedirectPromise();
+
+    var account = msalApp.getAllAccounts()[0];
+    if (!account) {
+      // Not signed in — trigger redirect to Microsoft login
+      loadProgress('Redirecting to Microsoft sign-in…', 15);
+      await msalApp.acquireTokenRedirect({
+        scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All']
+      });
+      return; // page redirects, code below won't run
+    }
+
+    loadProgress('Signed in as ' + account.username, 20);
+
+    loadProgress('Loading communities…', 30);
+    var commItems = await spGet('Communities');
+    C = commItems.map(function(f) {
+      return {
+        id: f.Title || uid(), _spId: f._spId,
+        name: f.Title || '',
+        location: f.location || '',
+        market: f.market || '',
+        totalPlanned: f.totalPlanned || '',
+        notes: f.notes || '',
+        tiers: safeJSON(f.tiers, []),
+        archived: f.archived === 'Yes' || f.archived === true,
+        archivedDate: f.archivedDate || '',
+        snapshot: safeJSON(f.snapshot, {})
+      };
+    });
+
+    loadProgress('Loading lots…', 50);
+    var lotItems = await spGet('Lots');
+    L = lotItems.map(function(f) {
+      return {
+        id: f.Title || uid(), _spId: f._spId,
+        community: f.communityId || '',
+        lotNumber: f.lotNumber || '',
+        block: f.block || '',
+        status: f.status || 'Available',
+        listPrice: f.listPrice || 0,
+        depositCredit: f.depositCredit || 0,
+        buyer: f.buyer || '',
+        market: f.market || '',
+        tier: f.tier || '',
+        contractDate: f.contractDate || '',
+        closingDate: f.closingDate || '',
+        docsSent: f.docsSent === 'Yes',
+        qbEntry: f.qbEntry === 'Yes',
+        notes: f.notes || ''
+      };
+    });
+
+    loadProgress('Loading takedown schedules…', 75);
+    var tdItems = await spGet('Takedowns');
+    TD = tdItems.map(function(f) {
+      return {
+        id: f.Title || uid(), _spId: f._spId,
+        community: f.communityId || '',
+        date: f.date || '',
+        tier: f.tier || '',
+        count: Number(f.count) || 0,
+        notes: f.notes || ''
+      };
+    });
+
+    loadProgress('Loading archive…', 90);
+    var archItems = await spGet('Archive');
+    // Merge archive data into communities (already loaded above)
+    archItems.forEach(function(f) {
+      var existing = C.find(function(c) { return c.name === f.Title; });
+      if (!existing) {
+        C.push({
+          id: f.Title || uid(), _spId: null,
+          name: f.Title || '',
+          location: f.location || '',
+          market: f.market || '',
+          totalPlanned: 0, notes: '', tiers: [],
+          archived: true,
+          archivedDate: f.archivedDate || '',
+          snapshot: safeJSON(f.snapshot, {})
+        });
+      }
+    });
+
+    LOG = [];
+    loadProgress('Ready', 100);
+    setTimeout(function() {
+      document.getElementById('loading-overlay').style.display = 'none';
+      render();
+    }, 400);
+
+  } catch(e) {
+    loadProgress('Error: ' + e.message + ' — loading demo data', 100);
+    console.error('SharePoint load error:', e);
+    setTimeout(function() {
+      document.getElementById('loading-overlay').style.display = 'none';
+      seed();
+      render();
+      toast('Could not connect to SharePoint — showing demo data');
+    }, 1500);
+  }
+}
+
+function safeJSON(str, fallback) {
+  if (!str) return fallback;
+  if (typeof str === 'object') return str;
+  try { return JSON.parse(str); } catch(e) { return fallback; }
+}
+
+// ── SAVE TO SHAREPOINT ────────────────────────────────────────────────────────
+// Called after every data mutation — async, non-blocking
+async function spSaveLot(lot) {
+  var fields = {
+    Title: lot.id,
+    communityId: lot.community,
+    communityName: cn(lot.community),
+    lotNumber: lot.lotNumber || '',
+    block: lot.block || '',
+    status: lot.status || 'Available',
+    listPrice: Number(lot.listPrice) || 0,
+    depositCredit: Number(lot.depositCredit) || 0,
+    buyer: lot.buyer || '',
+    market: lot.market || '',
+    tier: lot.tier || '',
+    contractDate: lot.contractDate || '',
+    closingDate: lot.closingDate || '',
+    docsSent: lot.docsSent ? 'Yes' : 'No',
+    qbEntry: lot.qbEntry ? 'Yes' : 'No',
+    notes: lot.notes || ''
+  };
+  try {
+    if (lot._spId) { await spUpdate('Lots', lot._spId, fields); }
+    else { var newId = await spCreate('Lots', fields); lot._spId = newId; }
+  } catch(e) { console.error('Save lot failed:', e); toast('⚠ Save failed — check connection'); }
+}
+
+async function spDeleteLot(lot) {
+  if (lot._spId) {
+    try { await spDelete('Lots', lot._spId); } catch(e) { console.error('Delete lot failed:', e); }
+  }
+}
+
+async function spSaveCommunity(comm) {
+  var fields = {
+    Title: comm.name,
+    location: comm.location || '',
+    market: comm.market || '',
+    totalPlanned: Number(comm.totalPlanned) || 0,
+    notes: comm.notes || '',
+    tiers: JSON.stringify(comm.tiers || []),
+    archived: comm.archived ? 'Yes' : 'No',
+    archivedDate: comm.archivedDate || '',
+    snapshot: JSON.stringify(comm.snapshot || {})
+  };
+  try {
+    if (comm._spId) { await spUpdate('Communities', comm._spId, fields); }
+    else { var newId = await spCreate('Communities', fields); comm._spId = newId; }
+  } catch(e) { console.error('Save community failed:', e); toast('⚠ Save failed — check connection'); }
+}
+
+async function spDeleteCommunity(comm) {
+  if (comm._spId) {
+    try { await spDelete('Communities', comm._spId); } catch(e) { console.error('Delete community failed:', e); }
+  }
+}
+
+async function spSaveTD(td) {
+  var fields = {
+    Title: td.id,
+    communityId: td.community,
+    communityName: cn(td.community),
+    date: td.date || '',
+    tier: td.tier || '',
+    count: Number(td.count) || 0,
+    notes: td.notes || ''
+  };
+  try {
+    if (td._spId) { await spUpdate('Takedowns', td._spId, fields); }
+    else { var newId = await spCreate('Takedowns', fields); td._spId = newId; }
+  } catch(e) { console.error('Save takedown failed:', e); toast('⚠ Save failed — check connection'); }
+}
+
+async function spDeleteTD(td) {
+  if (td._spId) {
+    try { await spDelete('Takedowns', td._spId); } catch(e) { console.error('Delete takedown failed:', e); }
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+loadFromSharePoint();
+
+// Drag & drop for import
+document.addEventListener('DOMContentLoaded',function(){
+  function wireDrop(zoneId,fileInputId,handler){
+    var dz=document.getElementById(zoneId);
+    if(!dz)return;
+    dz.addEventListener('dragover',function(e){e.preventDefault();dz.style.borderColor='var(--accent2)';dz.style.background='var(--surface2)'});
+    dz.addEventListener('dragleave',function(){dz.style.borderColor='';dz.style.background=''});
+    dz.addEventListener('drop',function(e){
+      e.preventDefault();dz.style.borderColor='';dz.style.background='';
+      var f=e.dataTransfer.files[0];
+      if(f)handler({target:{files:e.dataTransfer.files}});
+    });
+  }
+  wireDrop('import-dropzone','import-file',handleImport);
+  wireDrop('td-dropzone','td-csv',handleTDImport);
+  wireDrop('td-dropzone-xl','td-xlsx',handleTDExcel);
+});
+</script>
+</body>
+</html>
