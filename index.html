@@ -2960,9 +2960,10 @@ var msalApp = new msal.PublicClientApplication({
   auth: {
     clientId:    SP_CONFIG.clientId,
     authority:   'https://login.microsoftonline.com/' + SP_CONFIG.tenantId,
-    redirectUri: 'https://bwinnard.github.io/lotledger/'
+    redirectUri: 'https://bwinnard.github.io/lotledger/',
+    navigateToLoginRequestUrl: false
   },
-  cache: { cacheLocation: 'sessionStorage' }
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
 });
 
 var spToken = null;
@@ -2975,12 +2976,11 @@ async function getToken() {
     if (account) {
       return (await msalApp.acquireTokenSilent({ ...req, account })).accessToken;
     }
-    // Use redirect flow — works in all browsers including SharePoint viewer
-    await msalApp.acquireTokenRedirect(req);
-    return null; // page will reload after redirect
+    await msalApp.acquireTokenRedirect({ ...req, redirectUri: 'https://bwinnard.github.io/lotledger/' });
+    return null;
   } catch(e) {
     if (e.name === 'InteractionRequiredAuthError') {
-      await msalApp.acquireTokenRedirect(req);
+      await msalApp.acquireTokenRedirect({ ...req, redirectUri: 'https://bwinnard.github.io/lotledger/' });
       return null;
     }
     throw e;
@@ -3043,18 +3043,20 @@ function loadProgress(msg, pct) {
 
 async function loadFromSharePoint() {
   try {
-    // Handle redirect response first (MSAL redirect flow)
-    await msalApp.handleRedirectPromise();
+    // Handle the redirect response — captures token when MS redirects back
+    var redirectResult = await msalApp.handleRedirectPromise();
+    if (redirectResult) {
+      console.log('Signed in via redirect:', redirectResult.account.username);
+    }
 
     var account = msalApp.getAllAccounts()[0];
     if (!account) {
-      // Not signed in — trigger redirect to Microsoft login
       loadProgress('Redirecting to Microsoft sign-in…', 15);
       await msalApp.acquireTokenRedirect({
         scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
         redirectUri: 'https://bwinnard.github.io/lotledger/'
       });
-      return; // page redirects, code below won't run
+      return;
     }
 
     loadProgress('Signed in as ' + account.username, 20);
