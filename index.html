@@ -2951,7 +2951,13 @@ function toast(msg){
 var SP_CONFIG = {
   tenantId:   'f328b836-b436-478b-adb9-f057cdd68b84',
   clientId:   '9d23a65f-331e-4336-b1b8-cfbf09feff45',
-  siteId:     'e00cf237-cce1-441d-9f78-00ebf908e97d',
+  siteId:     'coronadowestaz.sharepoint.com,e00cf237-cce1-441d-9f78-00ebf908e97d,4d27a49d-18ca-457f-84b0-becb6b26e255',
+  lists: {
+    Communities: '867fbf7c-7cbd-473e-a114-6ea02203a69a',
+    Lots:        '8d7abe34-d9c0-47dc-9081-eaed25e4498f',
+    Takedowns:   '148d6b2a-6b6a-41dc-8af4-92134f41423c',
+    Archive:     '1cb91a32-5c35-46ff-a5bd-f662d3af5dec'
+  },
   siteUrl:    'https://coronadowestaz.sharepoint.com/sites/LotLedger',
   tenant:     'coronadowestaz'
 };
@@ -2983,7 +2989,8 @@ var GRAPH = 'https://graph.microsoft.com/v1.0';
 
 async function spGet(listName) {
   var token = await getToken();
-  var url = GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items?expand=fields&$top=5000';
+  var listId = SP_CONFIG.lists[listName] || listName;
+  var url = GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listId + '/items?expand=fields&$top=5000';
   var items = [], nextLink = url;
   while (nextLink) {
     var r = await fetch(nextLink, { headers: { Authorization: 'Bearer ' + token } });
@@ -2997,7 +3004,8 @@ async function spGet(listName) {
 
 async function spCreate(listName, fields) {
   var token = await getToken();
-  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items', {
+  var listId = SP_CONFIG.lists[listName] || listName;
+  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listId + '/items', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields: fields })
@@ -3009,7 +3017,8 @@ async function spCreate(listName, fields) {
 
 async function spUpdate(listName, spId, fields) {
   var token = await getToken();
-  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items/' + spId + '/fields', {
+  var listId = SP_CONFIG.lists[listName] || listName;
+  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listId + '/items/' + spId + '/fields', {
     method: 'PATCH',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify(fields)
@@ -3020,7 +3029,8 @@ async function spUpdate(listName, spId, fields) {
 
 async function spDelete(listName, spId) {
   var token = await getToken();
-  await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listName + '/items/' + spId, {
+  var listId = SP_CONFIG.lists[listName] || listName;
+  await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listId + '/items/' + spId, {
     method: 'DELETE',
     headers: { Authorization: 'Bearer ' + token }
   });
@@ -3146,22 +3156,12 @@ function safeJSON(str, fallback) {
 // Diagnostic — run spDiagnoseFields() in browser console to see actual SP field names
 async function spDiagnoseFields() {
   var token = await getToken();
-  console.log('Step 1: Getting site info...');
-  // Try the hostname:path format for site ID
-  var siteUrl = 'https://graph.microsoft.com/v1.0/sites/coronadowestaz.sharepoint.com:/sites/LotLedger';
-  var r1 = await fetch(siteUrl, { headers: { Authorization: 'Bearer ' + token }});
-  var d1 = await r1.json();
-  console.log('Site response:', JSON.stringify(d1).slice(0,300));
-  if (d1.id) {
-    console.log('Correct site ID:', d1.id);
-    // Now get lists
-    var r2 = await fetch('https://graph.microsoft.com/v1.0/sites/' + d1.id + '/lists', {
-      headers: { Authorization: 'Bearer ' + token }
-    });
-    var d2 = await r2.json();
-    console.log('Lists:');
-    (d2.value||[]).forEach(function(l){ console.log(' -', l.displayName, '| id:', l.id); });
-  }
+  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + SP_CONFIG.lists.Lots + '/columns', {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+  var d = await r.json();
+  console.log('Lots list columns:');
+  (d.value||[]).forEach(function(f){ console.log(' -', f.name, '→', f.displayName); });
 }
 
 async function spSaveLot(lot) {
