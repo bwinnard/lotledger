@@ -623,19 +623,19 @@ textarea{resize:vertical}
     <div class="modal-head"><div class="modal-title" id="lm-title">Add Lot</div><button class="modal-x" onclick="closeLotModal()">✕</button></div>
     <div class="modal-body">
       <div class="fgrid">
-        <div class="fg"><label>Community *</label><select id="lm-comm" onchange="loadTiers()"></select></div>
-        <div class="fg"><label>Status *</label><select id="lm-status"><option>Available</option><option>Pending</option><option>Sold</option></select></div>
-        <div class="fg"><label>Lot # (blank = TBD)</label><input id="lm-lot" placeholder="Leave blank if unplatted" autocomplete="off"></div>
-        <div class="fg"><label>Block / Phase (blank = TBD)</label><input id="lm-block" placeholder="Leave blank if unplatted" autocomplete="off"></div>
-        <div class="fg"><label>Builder / Buyer</label><input id="lm-buyer" placeholder="e.g. DR Horton"></div>
-        <div class="fg"><label>Market</label><input id="lm-market" placeholder="e.g. Phoenix, DFW"></div>
-        <div class="fg"><label>Price Tier</label><select id="lm-tier" onchange="applyTier()"><option value="">No tier — custom pricing</option></select></div>
+        <div class="fg"><label>Community *</label><select id="lm-comm" onchange="loadTiers()" autocomplete="off"></select></div>
+        <div class="fg"><label>Status *</label><select id="lm-status" autocomplete="off"><option>Available</option><option>Pending</option><option>Sold</option></select></div>
+        <div class="fg"><label>Lot # (blank = TBD)</label><input id="lm-lot" placeholder="Leave blank if unplatted" autocomplete="new-password" oninput="guardTier()"></div>
+        <div class="fg"><label>Block / Phase (blank = TBD)</label><input id="lm-block" placeholder="Leave blank if unplatted" autocomplete="new-password" oninput="guardTier()"></div>
+        <div class="fg"><label>Builder / Buyer</label><input id="lm-buyer" placeholder="e.g. DR Horton" autocomplete="new-password"></div>
+        <div class="fg"><label>Market</label><input id="lm-market" placeholder="e.g. Phoenix, DFW" autocomplete="new-password"></div>
+        <div class="fg"><label>Price Tier</label><select id="lm-tier" onchange="applyTier()" autocomplete="off"><option value="">No tier — custom pricing</option></select></div>
         <div class="fg" id="tier-preview-wrap" style="display:none"><label>Tier Pricing</label><div class="tier-preview" id="tier-preview"></div></div>
-        <div class="fg"><label>List Price ($)</label><input type="number" id="lm-price" placeholder="0"></div>
-        <div class="fg"><label>Deposit Credit ($)</label><input type="number" id="lm-deposit" placeholder="0"></div>
-        <div class="fg"><label>Contract Date</label><input type="date" id="lm-cdate"></div>
-        <div class="fg"><label>Expected Closing</label><input type="date" id="lm-closing"></div>
-        <div class="fg full"><label>Notes</label><textarea id="lm-notes" rows="2" placeholder="Contingencies, details…"></textarea></div>
+        <div class="fg"><label>List Price ($)</label><input type="number" id="lm-price" placeholder="0" autocomplete="new-password"></div>
+        <div class="fg"><label>Deposit Credit ($)</label><input type="number" id="lm-deposit" placeholder="0" autocomplete="new-password"></div>
+        <div class="fg"><label>Contract Date</label><input type="date" id="lm-cdate" autocomplete="off"></div>
+        <div class="fg"><label>Expected Closing</label><input type="date" id="lm-closing" autocomplete="off"></div>
+        <div class="fg full"><label>Notes</label><textarea id="lm-notes" rows="2" placeholder="Contingencies, details…" autocomplete="off"></textarea></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1719,16 +1719,27 @@ function openLotModal(id){
   sv('lm-closing',lot?lot.closingDate:'');
   sv('lm-notes', lot?lot.notes:'');
   loadTiers();
-  if(lot&&lot.tier)sv('lm-tier',lot.tier);
+  if(lot&&lot.tier){sv('lm-tier',lot.tier);_savedTier=lot.tier;}
+  else{_savedTier='';}
   document.getElementById('lot-modal').classList.add('open');
 }
 function closeLotModal(){document.getElementById('lot-modal').classList.remove('open')}
+
+var _savedTier = '';  // protects tier from browser autofill
+
+function guardTier(){
+  var sel = document.getElementById('lm-tier');
+  if(sel && _savedTier && sel.value !== _savedTier){
+    sel.value = _savedTier;
+    applyTier();
+  }
+}
 
 function loadTiers(){
   var cid=gv('lm-comm');
   var comm=C.find(function(c){return c.id===cid});
   var sel=document.getElementById('lm-tier');
-  var currentTier=sel.value; // preserve current selection
+  var currentTier=sel.value||_savedTier;
   sel.innerHTML='<option value="">No tier — custom pricing</option>';
   (comm&&comm.tiers?comm.tiers:[]).forEach(function(t){
     var o=document.createElement('option');
@@ -1736,8 +1747,8 @@ function loadTiers(){
     o.textContent=t.name+' · List '+fmt(t.listPrice)+' · Dep '+fmt(t.depositCredit);
     sel.appendChild(o);
   });
-  // Restore previous selection if it still exists in the list
   if(currentTier)sel.value=currentTier;
+  _savedTier=sel.value;
   document.getElementById('tier-preview-wrap').style.display='none';
   if(sel.value)applyTier();
 }
@@ -1746,6 +1757,7 @@ function applyTier(){
   var cid=gv('lm-comm');
   var comm=C.find(function(c){return c.id===cid});
   var tn=gv('lm-tier');
+  _savedTier=tn; // keep in sync so guardTier works
   var wrap=document.getElementById('tier-preview-wrap');
   if(!tn||!comm){wrap.style.display='none';return}
   var t=(comm.tiers||[]).find(function(x){return x.name===tn});
