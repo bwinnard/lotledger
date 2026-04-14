@@ -3078,20 +3078,20 @@ async function loadFromSharePoint() {
     L = lotItems.map(function(f) {
       return {
         id: f.Title || uid(), _spId: f._spId,
-        community: f.communityId || '',
-        lotNumber: f.lotNumber || '',
-        block: f.block || '',
-        status: f.status || 'Available',
-        listPrice: f.listPrice || 0,
-        depositCredit: f.depositCredit || 0,
-        buyer: f.buyer || '',
-        market: f.market || '',
-        tier: f.tier || '',
-        contractDate: f.contractDate || '',
-        closingDate: f.closingDate || '',
-        docsSent: f.docsSent === 'Yes',
-        qbEntry: f.qbEntry === 'Yes',
-        notes: f.notes || ''
+        community: f.field_1 || '',
+        lotNumber: f.field_3 || '',
+        block: f.field_4 || '',
+        status: f.field_5 || 'Available',
+        listPrice: f.field_6 || 0,
+        depositCredit: f.field_7 || 0,
+        buyer: f.field_8 || '',
+        market: f.field_9 || '',
+        tier: f.field_10 || '',
+        contractDate: f.field_11 || '',
+        closingDate: f.field_12 || '',
+        docsSent: f.field_13 === 'Yes',
+        qbEntry: f.field_14 === 'Yes',
+        notes: f.field_15 || ''
       };
     });
 
@@ -3156,43 +3156,42 @@ function safeJSON(str, fallback) {
 // Diagnostic — run spDiagnoseFields() in browser console to see actual SP field names
 async function spDiagnoseFields() {
   var token = await getToken();
-  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + SP_CONFIG.lists.Lots + '/columns', {
-    headers: { Authorization: 'Bearer ' + token }
-  });
-  var d = await r.json();
-  console.log('Lots list columns:');
-  (d.value||[]).forEach(function(f){ console.log(' -', f.name, '→', f.displayName); });
+  for (var listName of ['Communities','Lots','Takedowns','Archive']) {
+    var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + SP_CONFIG.lists[listName] + '/columns', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    var d = await r.json();
+    console.log('\n=== ' + listName + ' ===');
+    (d.value||[]).filter(function(f){return !f.readOnly&&f.name!=='ID'&&f.name!=='Title'}).forEach(function(f){
+      console.log(' -', f.name, '→', f.displayName);
+    });
+  }
 }
 
 async function spSaveLot(lot) {
-  // Use SharePoint internal field names — these match the CSV column headers exactly
   var fields = {
-    Title: lot.id,
-    communityId: lot.community,
-    communityName: cn(lot.community),
-    lotNumber: lot.lotNumber || '',
-    block: lot.block || '',
-    status: lot.status || 'Available',
-    listPrice: Number(lot.listPrice) || 0,
-    depositCredit: Number(lot.depositCredit) || 0,
-    buyer: lot.buyer || '',
-    market: lot.market || '',
-    tier: lot.tier || '',
-    contractDate: lot.contractDate || '',
-    closingDate: lot.closingDate || '',
-    docsSent: lot.docsSent ? 'Yes' : 'No',
-    qbEntry: lot.qbEntry ? 'Yes' : 'No',
-    notes: lot.notes || ''
+    Title:    lot.id,
+    field_1:  lot.community,
+    field_2:  cn(lot.community),
+    field_3:  lot.lotNumber || '',
+    field_4:  lot.block || '',
+    field_5:  lot.status || 'Available',
+    field_6:  Number(lot.listPrice) || 0,
+    field_7:  Number(lot.depositCredit) || 0,
+    field_8:  lot.buyer || '',
+    field_9:  lot.market || '',
+    field_10: lot.tier || '',
+    field_11: lot.contractDate || '',
+    field_12: lot.closingDate || '',
+    field_13: lot.docsSent ? 'Yes' : 'No',
+    field_14: lot.qbEntry ? 'Yes' : 'No',
+    field_15: lot.notes || ''
   };
   try {
     if (lot._spId) { await spUpdate('Lots', lot._spId, fields); }
     else { var newId = await spCreate('Lots', fields); lot._spId = newId; }
   } catch(e) {
     console.error('Save lot failed:', e);
-    // Try to identify which field is the problem
-    if (e.message && e.message.includes('not recognized')) {
-      console.error('Field name mismatch — run spDiagnoseFields() in console to see actual SP field names');
-    }
     toast('⚠ Save failed — check connection');
   }
 }
