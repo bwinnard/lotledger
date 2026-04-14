@@ -3146,25 +3146,22 @@ function safeJSON(str, fallback) {
 // Diagnostic — run spDiagnoseFields() in browser console to see actual SP field names
 async function spDiagnoseFields() {
   var token = await getToken();
-  // First get the list ID
-  var r1 = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists?$filter=displayName eq \'Lots\'', {
-    headers: { Authorization: 'Bearer ' + token }
-  });
+  console.log('Step 1: Getting site info...');
+  // Try the hostname:path format for site ID
+  var siteUrl = 'https://graph.microsoft.com/v1.0/sites/coronadowestaz.sharepoint.com:/sites/LotLedger';
+  var r1 = await fetch(siteUrl, { headers: { Authorization: 'Bearer ' + token }});
   var d1 = await r1.json();
-  if (!d1.value || !d1.value.length) { console.log('Lots list not found. Lists available:'); 
-    var r2 = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists', { headers: { Authorization: 'Bearer ' + token }});
+  console.log('Site response:', JSON.stringify(d1).slice(0,300));
+  if (d1.id) {
+    console.log('Correct site ID:', d1.id);
+    // Now get lists
+    var r2 = await fetch('https://graph.microsoft.com/v1.0/sites/' + d1.id + '/lists', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
     var d2 = await r2.json();
-    d2.value.forEach(function(l){ console.log(' -', l.displayName, '→ id:', l.id); });
-    return;
+    console.log('Lists:');
+    (d2.value||[]).forEach(function(l){ console.log(' -', l.displayName, '| id:', l.id); });
   }
-  var listId = d1.value[0].id;
-  console.log('Lots list ID:', listId);
-  var r3 = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/' + listId + '/columns', {
-    headers: { Authorization: 'Bearer ' + token }
-  });
-  var d3 = await r3.json();
-  console.log('SharePoint Lots columns:');
-  d3.value.forEach(function(f) { console.log(' -', f.name, '→ displayName:', f.displayName); });
 }
 
 async function spSaveLot(lot) {
