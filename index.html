@@ -625,8 +625,8 @@ textarea{resize:vertical}
       <div class="fgrid">
         <div class="fg"><label>Community *</label><select id="lm-comm" onchange="loadTiers()"></select></div>
         <div class="fg"><label>Status *</label><select id="lm-status"><option>Available</option><option>Pending</option><option>Sold</option></select></div>
-        <div class="fg"><label>Lot # (blank = TBD)</label><input id="lm-lot" placeholder="Leave blank if unplatted"></div>
-        <div class="fg"><label>Block / Phase (blank = TBD)</label><input id="lm-block" placeholder="Leave blank if unplatted"></div>
+        <div class="fg"><label>Lot # (blank = TBD)</label><input id="lm-lot" placeholder="Leave blank if unplatted" autocomplete="off"></div>
+        <div class="fg"><label>Block / Phase (blank = TBD)</label><input id="lm-block" placeholder="Leave blank if unplatted" autocomplete="off"></div>
         <div class="fg"><label>Builder / Buyer</label><input id="lm-buyer" placeholder="e.g. DR Horton"></div>
         <div class="fg"><label>Market</label><input id="lm-market" placeholder="e.g. Phoenix, DFW"></div>
         <div class="fg"><label>Price Tier</label><select id="lm-tier" onchange="applyTier()"><option value="">No tier — custom pricing</option></select></div>
@@ -1727,6 +1727,7 @@ function loadTiers(){
   var cid=gv('lm-comm');
   var comm=C.find(function(c){return c.id===cid});
   var sel=document.getElementById('lm-tier');
+  var currentTier=sel.value; // preserve current selection
   sel.innerHTML='<option value="">No tier — custom pricing</option>';
   (comm&&comm.tiers?comm.tiers:[]).forEach(function(t){
     var o=document.createElement('option');
@@ -1734,7 +1735,10 @@ function loadTiers(){
     o.textContent=t.name+' · List '+fmt(t.listPrice)+' · Dep '+fmt(t.depositCredit);
     sel.appendChild(o);
   });
+  // Restore previous selection if it still exists in the list
+  if(currentTier)sel.value=currentTier;
   document.getElementById('tier-preview-wrap').style.display='none';
+  if(sel.value)applyTier();
 }
 
 function applyTier(){
