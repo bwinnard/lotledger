@@ -3059,6 +3059,9 @@ async function loadFromSharePoint() {
     loadProgress('Loading communities…', 30);
     var commItems = await spGet('Communities');
     C = commItems.map(function(f) {
+      // Use the stored UUID from field_1 if available (set when community was first saved)
+      // Fall back to Title so existing data still links correctly
+      var commId = f.field_9 || f.Title || uid(); // field_9 reserved for id storage — see below
       return {
         id: f.Title || uid(), _spId: f._spId,
         name: f.Title || '',
@@ -3073,12 +3076,28 @@ async function loadFromSharePoint() {
       };
     });
 
+    // Build a communityId → community lookup for lot linkage
+    // lots store the community UUID in field_1 — find which community has that UUID
+    // by matching against the community's _spId or name
+    var commById = {};
+    C.forEach(function(c){ commById[c.id] = c; });
+
     loadProgress('Loading lots…', 50);
     var lotItems = await spGet('Lots');
     L = lotItems.map(function(f) {
+      // field_1 on a lot = communityId (UUID). Find the community with that id.
+      // If not found by UUID, try matching by communityName (field_2) as fallback
+      var commId = f.field_1 || '';
+      var commName = f.field_2 || '';
+      // Check if commId directly matches a community id
+      if (!commById[commId]) {
+        // Try to find by name
+        var found = C.find(function(c){ return c.name === commName; });
+        if (found) commId = found.id;
+      }
       return {
         id: f.Title || uid(), _spId: f._spId,
-        community: f.field_1 || '',
+        community: commId,
         lotNumber: f.field_3 || '',
         block: f.field_4 || '',
         status: f.field_5 || 'Available',
@@ -3180,8 +3199,8 @@ async function spDiagnoseFields() {
 async function spSaveLot(lot) {
   var fields = {
     Title:    lot.id,
-    field_1:  lot.community,
-    field_2:  cn(lot.community),
+    field_1:  lot.community,        // communityId (UUID)
+    field_2:  cn(lot.community),    // communityName (for fallback matching on reload)
     field_3:  lot.lotNumber || '',
     field_4:  lot.block || '',
     field_5:  lot.status || 'Available',
