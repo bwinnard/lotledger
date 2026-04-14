@@ -3062,14 +3062,14 @@ async function loadFromSharePoint() {
       return {
         id: f.Title || uid(), _spId: f._spId,
         name: f.Title || '',
-        location: f.location || '',
-        market: f.market || '',
-        totalPlanned: f.totalPlanned || '',
-        notes: f.notes || '',
-        tiers: safeJSON(f.tiers, []),
-        archived: f.archived === 'Yes' || f.archived === true,
-        archivedDate: f.archivedDate || '',
-        snapshot: safeJSON(f.snapshot, {})
+        location: f.field_1 || '',
+        market: f.field_2 || '',
+        totalPlanned: f.field_3 || '',
+        notes: f.field_4 || '',
+        tiers: safeJSON(f.field_5, []),
+        archived: f.field_6 === 'Yes' || f.field_6 === true,
+        archivedDate: f.field_7 || '',
+        snapshot: safeJSON(f.field_8, {})
       };
     });
 
@@ -3100,29 +3100,28 @@ async function loadFromSharePoint() {
     TD = tdItems.map(function(f) {
       return {
         id: f.Title || uid(), _spId: f._spId,
-        community: f.communityId || '',
-        date: f.date || '',
-        tier: f.tier || '',
-        count: Number(f.count) || 0,
-        notes: f.notes || ''
+        community: f.field_1 || '',
+        date: f.field_3 || '',
+        tier: f.field_4 || '',
+        count: Number(f.field_5) || 0,
+        notes: f.field_6 || ''
       };
     });
 
     loadProgress('Loading archive…', 90);
     var archItems = await spGet('Archive');
-    // Merge archive data into communities (already loaded above)
     archItems.forEach(function(f) {
       var existing = C.find(function(c) { return c.name === f.Title; });
       if (!existing) {
         C.push({
           id: f.Title || uid(), _spId: null,
           name: f.Title || '',
-          location: f.location || '',
-          market: f.market || '',
+          location: f.field_1 || '',
+          market: f.field_2 || '',
           totalPlanned: 0, notes: '', tiers: [],
           archived: true,
-          archivedDate: f.archivedDate || '',
-          snapshot: safeJSON(f.snapshot, {})
+          archivedDate: f.field_3 || '',
+          snapshot: safeJSON(f.field_4, {})
         });
       }
     });
@@ -3204,15 +3203,15 @@ async function spDeleteLot(lot) {
 
 async function spSaveCommunity(comm) {
   var fields = {
-    Title: comm.name,
-    location: comm.location || '',
-    market: comm.market || '',
-    totalPlanned: Number(comm.totalPlanned) || 0,
-    notes: comm.notes || '',
-    tiers: JSON.stringify(comm.tiers || []),
-    archived: comm.archived ? 'Yes' : 'No',
-    archivedDate: comm.archivedDate || '',
-    snapshot: JSON.stringify(comm.snapshot || {})
+    Title:   comm.name,
+    field_1: comm.location || '',
+    field_2: comm.market || '',
+    field_3: Number(comm.totalPlanned) || 0,
+    field_4: comm.notes || '',
+    field_5: JSON.stringify(comm.tiers || []),
+    field_6: comm.archived ? 'Yes' : 'No',
+    field_7: comm.archivedDate || '',
+    field_8: JSON.stringify(comm.snapshot || {})
   };
   try {
     if (comm._spId) { await spUpdate('Communities', comm._spId, fields); }
@@ -3228,13 +3227,13 @@ async function spDeleteCommunity(comm) {
 
 async function spSaveTD(td) {
   var fields = {
-    Title: td.id,
-    communityId: td.community,
-    communityName: cn(td.community),
-    date: td.date || '',
-    tier: td.tier || '',
-    count: Number(td.count) || 0,
-    notes: td.notes || ''
+    Title:   td.id,
+    field_1: td.community,
+    field_2: cn(td.community),
+    field_3: td.date || '',
+    field_4: td.tier || '',
+    field_5: Number(td.count) || 0,
+    field_6: td.notes || ''
   };
   try {
     if (td._spId) { await spUpdate('Takedowns', td._spId, fields); }
