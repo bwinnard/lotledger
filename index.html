@@ -1614,7 +1614,7 @@ function bulkApply(){
     l.status=ns;
     changedLots.push(l);
   });
-  changedLots.forEach(spSaveLot);
+  spSaveBatch(changedLots, spSaveLot);
   clearSel();renderLots();
   toast('Updated to "'+ns+'"');
   if(ns==='Pending'&&newPendingIds.length){
@@ -2176,7 +2176,7 @@ function confirmTDImport(){
     added++;
   });
   newComms.forEach(spSaveCommunity);
-  newTDs.forEach(spSaveTD);
+  spSaveBatch(newTDs, spSaveTD);
   deletedTDs.forEach(spDeleteTD);
   log('Takedown import: <strong>'+added+' entries</strong>'+(newComms.length?' · '+newComms.length+' new communities':''));
   closeTDImport();
@@ -2255,7 +2255,7 @@ function confirmBulkAdd(){
     newLots.push(lot);
     added++;
   }
-  newLots.forEach(spSaveLot);
+  spSaveBatch(newLots, spSaveLot);
   log('Bulk add: <strong>'+added+' lots</strong> ('+start+'–'+end+') added to '+cn(cid));
   closeBulkAdd();render();toast(added+' lots added to '+cn(cid));
   if(gv('ba-status')==='Pending')checkAutoArchive();
@@ -2536,7 +2536,7 @@ function confirmImport(){
   });
   // Save to SharePoint async (batched)
   newComms.forEach(spSaveCommunity);
-  newLots.forEach(spSaveLot);
+  spSaveBatch(newLots, spSaveLot);
   deletedLots.forEach(spDeleteLot);
   log('CSV import: <strong>'+added+' lots</strong> added'+(newComms.length?' · '+newComms.length+' new communities':''));
   closeImportModal();
@@ -3152,7 +3152,17 @@ function safeJSON(str, fallback) {
 }
 
 // ── SAVE TO SHAREPOINT ────────────────────────────────────────────────────────
-// Diagnostic — run spDiagnoseFields() in browser console to see actual SP field names
+// Batched save — sends in chunks of 5 with 300ms delay to avoid SP rate limits
+async function spSaveBatch(items, saveFn) {
+  var chunkSize = 5;
+  for (var i = 0; i < items.length; i += chunkSize) {
+    var chunk = items.slice(i, i + chunkSize);
+    await Promise.all(chunk.map(saveFn));
+    if (i + chunkSize < items.length) {
+      await new Promise(function(r){ setTimeout(r, 300); });
+    }
+  }
+}
 async function spDiagnoseFields() {
   var token = await getToken();
   for (var listName of ['Communities','Lots','Takedowns','Archive']) {
