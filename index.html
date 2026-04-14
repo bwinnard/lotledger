@@ -1011,8 +1011,9 @@ var curPage=1, pageSize=100, totalPages=1;
 // ── UTILS ──────────────────────────────────────────────────────────────────────
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function fmt(n){if(!n&&n!==0)return'—';return'$'+Number(n).toLocaleString()}
-function fmtD(d){if(!d)return'—';var p=d.split('-');return p[1]+'/'+p[2]+'/'+p[0].slice(2)}
-function cn(id){var c=C.find(x=>x.id===id);return c?c.name:'—'}
+function fmtD(d){if(!d)return'—';var p=d.split('-');if(p.length<3)return d;return p[1]+'/'+p[2]+'/'+p[0].slice(2)}
+function cn(id){var c=C.find(function(x){return x.id===id});return c?c.name:'—'}
+function cnSP(id){var c=C.find(function(x){return x.id===id});return c?c.name:''}
 function chipCls(s){return s==='Available'?'chip-a':s==='Pending'?'chip-p':'chip-s'}
 function chip(s){return'<span class="chip '+chipCls(s)+'">'+s+'</span>'}
 function gv(id){var e=document.getElementById(id);return e?e.value||'':''}
@@ -1768,7 +1769,8 @@ function saveLot(){
   if(editLotId){
     var old=L.find(function(l){return l.id===editLotId});
     if(old&&old.status!==lot.status)log('Lot <strong>'+(lot.lotNumber||'TBD')+'</strong> ('+cn(lot.community)+') → <strong>'+lot.status+'</strong>');
-    // preserve qbEntry and docsSent
+    // preserve _spId, qbEntry and docsSent
+    lot._spId=old?old._spId:null;
     lot.qbEntry=old?old.qbEntry:false;
     lot.docsSent=old?old.docsSent:false;
     var i=L.findIndex(function(l){return l.id===editLotId});L[i]=lot;
@@ -1905,10 +1907,17 @@ function saveComm(){
   if(editCommId){
     var c=C.find(function(x){return x.id===editCommId});
     if(!c)return;
+    var oldName=c.name;
     c.name=name;c.location=gv('cm-loc');c.market=gv('cm-market');
     c.totalPlanned=gv('cm-total');c.notes=gv('cm-notes');c.tiers=collectTiers();
+    // _spId already on c — preserved automatically
     log('Community updated: <strong>'+name+'</strong>');
     spSaveCommunity(c);
+    // If name changed, update field_2 on all lots so fallback matching stays accurate
+    if(oldName!==name){
+      var affected=L.filter(function(l){return l.community===c.id});
+      if(affected.length) spSaveBatch(affected, spSaveLot);
+    }
     closeCommModal();render();toast('Community updated: '+name);
   }else{
     var nc={id:uid(),name:name,location:gv('cm-loc'),market:gv('cm-market'),totalPlanned:gv('cm-total'),notes:gv('cm-notes'),tiers:collectTiers()};
@@ -2388,6 +2397,7 @@ function confirmClearAll(){
     return;
   }
   C=[];L=[];R=[];TD=[];LOG=[];sel=new Set();
+  curPage=1;pageSize=100;totalPages=1;
   closeClearModal();
   log('All data cleared — fresh start');
   render();toast('All data cleared');
@@ -2621,6 +2631,7 @@ function restoreCommunity(commId){
   if(!confirm('Restore '+c.name+' to active? It will reappear in all active views.'))return;
   c.archived=false;
   c.archivedDate=null;
+  spSaveCommunity(c);
   log('Community <strong>'+c.name+'</strong> restored to active');
   render();
   toast(c.name+' restored to active');
@@ -3077,11 +3088,10 @@ async function loadFromSharePoint() {
     loadProgress('Loading communities…', 30);
     var commItems = await spGet('Communities');
     C = commItems.map(function(f) {
-      // Use the stored UUID from field_1 if available (set when community was first saved)
-      // Fall back to Title so existing data still links correctly
-      var commId = f.field_9 || f.Title || uid(); // field_9 reserved for id storage — see below
+      // field_9 stores a stable UUID we write on save. Fall back to Title for legacy records.
+      var stableId = f.field_9 || f.Title || uid();
       return {
-        id: f.Title || uid(), _spId: f._spId,
+        id: stableId, _spId: f._spId,
         name: f.Title || '',
         location: f.field_1 || '',
         market: f.field_2 || '',
@@ -3094,24 +3104,22 @@ async function loadFromSharePoint() {
       };
     });
 
-    // Build a communityId → community lookup for lot linkage
-    // lots store the community UUID in field_1 — find which community has that UUID
-    // by matching against the community's _spId or name
-    var commById = {};
-    C.forEach(function(c){ commById[c.id] = c; });
+    // Build name→id lookup for lot community matching fallback
+    var commByName = {};
+    C.forEach(function(c){ commByName[c.name.toLowerCase()] = c; });
 
     loadProgress('Loading lots…', 50);
     var lotItems = await spGet('Lots');
     L = lotItems.map(function(f) {
-      // field_1 on a lot = communityId (UUID). Find the community with that id.
-      // If not found by UUID, try matching by communityName (field_2) as fallback
+      // field_1 = communityId (stable UUID), field_2 = communityName (fallback)
       var commId = f.field_1 || '';
-      var commName = f.field_2 || '';
-      // Check if commId directly matches a community id
-      if (!commById[commId]) {
-        // Try to find by name
-        var found = C.find(function(c){ return c.name === commName; });
-        if (found) commId = found.id;
+      var commName = (f.field_2 || '').toLowerCase();
+      // Check if commId matches a known community id
+      var matched = C.find(function(c){ return c.id === commId; });
+      if (!matched && commName) {
+        // Fallback: match by name
+        matched = commByName[commName];
+        if (matched) commId = matched.id;
       }
       return {
         id: f.Title || uid(), _spId: f._spId,
@@ -3192,13 +3200,16 @@ function safeJSON(str, fallback) {
 // Batched save — sends in chunks of 5 with 300ms delay to avoid SP rate limits
 async function spSaveBatch(items, saveFn) {
   var chunkSize = 5;
+  var failures = 0;
   for (var i = 0; i < items.length; i += chunkSize) {
     var chunk = items.slice(i, i + chunkSize);
-    await Promise.all(chunk.map(saveFn));
+    var results = await Promise.allSettled(chunk.map(saveFn));
+    results.forEach(function(r){ if(r.status==='rejected'){ failures++; console.error('Batch save item failed:', r.reason); }});
     if (i + chunkSize < items.length) {
       await new Promise(function(r){ setTimeout(r, 300); });
     }
   }
+  if (failures > 0) toast('⚠ '+failures+' item'+(failures>1?'s':'')+' failed to save — check connection');
 }
 async function spDiagnoseFields() {
   var token = await getToken();
@@ -3218,7 +3229,7 @@ async function spSaveLot(lot) {
   var fields = {
     Title:    lot.id,
     field_1:  lot.community,        // communityId (UUID)
-    field_2:  cn(lot.community),    // communityName (for fallback matching on reload)
+    field_2:  cnSP(lot.community),    // communityName (for fallback matching on reload)
     field_3:  lot.lotNumber || '',
     field_4:  lot.block || '',
     field_5:  lot.status || 'Available',
@@ -3259,6 +3270,8 @@ async function spSaveCommunity(comm) {
     field_6: comm.archived ? 'Yes' : 'No',
     field_7: comm.archivedDate || '',
     field_8: JSON.stringify(comm.snapshot || {})
+    // field_9 would store stable UUID but Communities list only has 8 custom fields
+    // ID stability is handled via name matching fallback
   };
   try {
     if (comm._spId) { await spUpdate('Communities', comm._spId, fields); }
@@ -3276,7 +3289,7 @@ async function spSaveTD(td) {
   var fields = {
     Title:   td.id,
     field_1: td.community,
-    field_2: cn(td.community),
+    field_2: cnSP(td.community),
     field_3: td.date || '',
     field_4: td.tier || '',
     field_5: Number(td.count) || 0,
