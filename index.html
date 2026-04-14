@@ -2960,31 +2960,22 @@ var msalApp = new msal.PublicClientApplication({
   auth: {
     clientId:    SP_CONFIG.clientId,
     authority:   'https://login.microsoftonline.com/' + SP_CONFIG.tenantId,
-    redirectUri: 'https://bwinnard.github.io/lotledger/',
-    navigateToLoginRequestUrl: false
+    redirectUri: 'https://bwinnard.github.io/lotledger/'
   },
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
 });
-
-var spToken = null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 async function getToken() {
   var account = msalApp.getAllAccounts()[0];
   var req = { scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'] };
-  try {
-    if (account) {
+  if (account) {
+    try {
       return (await msalApp.acquireTokenSilent({ ...req, account })).accessToken;
-    }
-    await msalApp.acquireTokenRedirect({ ...req, redirectUri: 'https://bwinnard.github.io/lotledger/' });
-    return null;
-  } catch(e) {
-    if (e.name === 'InteractionRequiredAuthError') {
-      await msalApp.acquireTokenRedirect({ ...req, redirectUri: 'https://bwinnard.github.io/lotledger/' });
-      return null;
-    }
-    throw e;
+    } catch(e) {}
   }
+  // Popup — works from GitHub Pages since it's not inside a frame
+  return (await msalApp.acquireTokenPopup(req)).accessToken;
 }
 
 // ── GRAPH API HELPERS ─────────────────────────────────────────────────────────
@@ -3043,23 +3034,17 @@ function loadProgress(msg, pct) {
 
 async function loadFromSharePoint() {
   try {
-    // Handle the redirect response — captures token when MS redirects back
-    var redirectResult = await msalApp.handleRedirectPromise();
-    if (redirectResult) {
-      console.log('Signed in via redirect:', redirectResult.account.username);
-    }
+    loadProgress('Signing in to Microsoft…', 10);
 
-    var account = msalApp.getAllAccounts()[0];
-    if (!account) {
-      loadProgress('Redirecting to Microsoft sign-in…', 15);
-      await msalApp.acquireTokenRedirect({
-        scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
-        redirectUri: 'https://bwinnard.github.io/lotledger/'
-      });
+    // Use popup — stays on the page, no redirect away
+    var token = await getToken();
+    if (!token) {
+      loadProgress('Sign-in required — allow the popup and try again', 10);
       return;
     }
 
-    loadProgress('Signed in as ' + account.username, 20);
+    var account = msalApp.getAllAccounts()[0];
+    loadProgress('Signed in as ' + (account ? account.username : ''), 20);
 
     loadProgress('Loading communities…', 30);
     var commItems = await spGet('Communities');
@@ -3158,8 +3143,19 @@ function safeJSON(str, fallback) {
 }
 
 // ── SAVE TO SHAREPOINT ────────────────────────────────────────────────────────
-// Called after every data mutation — async, non-blocking
+// Diagnostic — run spDiagnoseFields() in browser console to see actual SP field names
+async function spDiagnoseFields() {
+  var token = await getToken();
+  var r = await fetch(GRAPH + '/sites/' + SP_CONFIG.siteId + '/lists/Lots/fields', {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+  var d = await r.json();
+  console.log('SharePoint Lots field names:');
+  d.value.forEach(function(f) { console.log(f.name, '→', f.displayName); });
+}
+
 async function spSaveLot(lot) {
+  // Use SharePoint internal field names — these match the CSV column headers exactly
   var fields = {
     Title: lot.id,
     communityId: lot.community,
@@ -3181,7 +3177,14 @@ async function spSaveLot(lot) {
   try {
     if (lot._spId) { await spUpdate('Lots', lot._spId, fields); }
     else { var newId = await spCreate('Lots', fields); lot._spId = newId; }
-  } catch(e) { console.error('Save lot failed:', e); toast('⚠ Save failed — check connection'); }
+  } catch(e) {
+    console.error('Save lot failed:', e);
+    // Try to identify which field is the problem
+    if (e.message && e.message.includes('not recognized')) {
+      console.error('Field name mismatch — run spDiagnoseFields() in console to see actual SP field names');
+    }
+    toast('⚠ Save failed — check connection');
+  }
 }
 
 async function spDeleteLot(lot) {
