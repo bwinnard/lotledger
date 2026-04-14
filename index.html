@@ -515,7 +515,7 @@ textarea{resize:vertical}
       <table>
         <thead><tr>
           <th>Community</th><th>Date</th><th>Tier/Type</th>
-          <th class="r">Due</th><th class="r">Taken</th><th class="r">Remaining</th>
+          <th class="r">Period Due</th><th class="r">Cumul. Required</th><th class="r">Total Taken</th><th class="r">Still Needed</th>
           <th>Status</th><th>Notes</th><th></th>
         </tr></thead>
         <tbody id="td-tbody"></tbody>
@@ -1627,15 +1627,28 @@ function tdStatus(td,win){
   var today=new Date();today.setHours(0,0,0,0);
   var due=new Date(td.date);due.setHours(0,0,0,0);
   var daysAway=Math.round((due-today)/86400000);
-  var taken=L.filter(function(l){
-    return l.community===td.community&&
-      (!td.tier||(l.tier||'').toLowerCase()===td.tier.toLowerCase())&&
-      (l.status==='Pending'||l.status==='Sold');
+
+  // Cumulative lots taken in this community/tier up to today
+  var takenToDate=L.filter(function(l){
+    if(l.community!==td.community)return false;
+    if(td.tier&&(l.tier||'').toLowerCase()!==td.tier.toLowerCase())return false;
+    return l.status==='Pending'||l.status==='Sold';
   }).length;
-  var remaining=Math.max(0,td.count-taken);
-  var ahead=taken>=td.count;
+
+  // Cumulative lots required by this period's date
+  // = sum of all takedown entries for same community/tier on or before this date
+  var cumulativeRequired=TD.filter(function(t){
+    if(t.community!==td.community)return false;
+    if(td.tier&&(t.tier||'').toLowerCase()!==(td.tier||'').toLowerCase())return false;
+    if(!td.tier&&t.tier)return false;
+    return new Date(t.date)<=due;
+  }).reduce(function(a,t){return a+Number(t.count||0)},0);
+
+  // Remaining = how many more still needed by this period
+  var remaining=Math.max(0,cumulativeRequired-takenToDate);
+  var ahead=takenToDate>=cumulativeRequired;
   var level=daysAway<0?'past':ahead?'ahead':daysAway<=14?'urgent':daysAway<=win?'warn':'ok';
-  return{daysAway:daysAway,taken:taken,remaining:remaining,ahead:ahead,level:level};
+  return{daysAway:daysAway,taken:takenToDate,required:cumulativeRequired,remaining:remaining,ahead:ahead,level:level};
 }
 
 function renderTakedown(){
@@ -1665,7 +1678,8 @@ function renderTakedown(){
       '<td class="mono">'+fmtD(td.date)+'</td>'+
       '<td>'+(td.tier||'<span style="color:var(--muted)">Any</span>')+'</td>'+
       '<td class="r mono">'+td.count+'</td>'+
-      '<td class="r mono" style="color:'+(s.taken>=td.count?'var(--avail)':'var(--ink)')+'">'+s.taken+'</td>'+
+      '<td class="r mono" style="color:var(--muted)">'+s.required+'</td>'+
+      '<td class="r mono" style="color:'+(s.taken>=s.required?'var(--avail)':'var(--ink)')+'">'+s.taken+'</td>'+
       '<td class="r mono" style="color:'+(s.remaining>0?'var(--danger)':'var(--avail)')+'">'+s.remaining+'</td>'+
       '<td>'+stHTML+'</td>'+
       '<td style="color:var(--muted);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis">'+(td.notes||'—')+'</td>'+
