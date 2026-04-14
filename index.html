@@ -1719,8 +1719,22 @@ function openLotModal(id){
   sv('lm-closing',lot?lot.closingDate:'');
   sv('lm-notes', lot?lot.notes:'');
   loadTiers();
-  if(lot&&lot.tier){sv('lm-tier',lot.tier);_savedTier=lot.tier;}
-  else{_savedTier='';}
+  if(lot&&lot.tier){
+    // Ensure the existing tier appears as an option even if community tiers aren't configured
+    var tierSel=document.getElementById('lm-tier');
+    var exists=Array.from(tierSel.options).some(function(o){return o.value===lot.tier});
+    if(!exists){
+      var opt=document.createElement('option');
+      opt.value=lot.tier;
+      opt.textContent=lot.tier+' (existing)';
+      tierSel.appendChild(opt);
+    }
+    sv('lm-tier',lot.tier);
+    _savedTier=lot.tier;
+    applyTier();
+  } else {
+    _savedTier='';
+  }
   document.getElementById('lot-modal').classList.add('open');
 }
 function closeLotModal(){document.getElementById('lot-modal').classList.remove('open')}
@@ -2574,8 +2588,29 @@ function confirmImport(){
     newLots.push(lot);
     added++;
   });
+
+  // Infer tiers for each community from imported lots and save them back
+  // This ensures the tier dropdown works in the edit modal
+  var updatedComms=[];
+  C.forEach(function(comm){
+    var commLots=newLots.filter(function(l){return l.community===comm.id&&l.tier&&l.listPrice});
+    if(!commLots.length)return;
+    var tierMap={};
+    commLots.forEach(function(l){
+      if(!tierMap[l.tier]){
+        tierMap[l.tier]={name:l.tier,listPrice:Number(l.listPrice)||0,depositCredit:Number(l.depositCredit)||0};
+      }
+    });
+    var inferredTiers=Object.values(tierMap);
+    // Only update if community has no tiers yet, or has fewer than what we found
+    if(!comm.tiers||comm.tiers.length<inferredTiers.length){
+      comm.tiers=inferredTiers;
+      if(!newComms.includes(comm))updatedComms.push(comm);
+    }
+  });
   // Save to SharePoint async (batched)
   newComms.forEach(spSaveCommunity);
+  updatedComms.forEach(spSaveCommunity);  // save existing communities whose tiers were inferred
   spSaveBatch(newLots, spSaveLot);
   deletedLots.forEach(spDeleteLot);
   log('CSV import: <strong>'+added+' lots</strong> added'+(newComms.length?' · '+newComms.length+' new communities':''));
